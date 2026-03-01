@@ -24,7 +24,7 @@ services:
       DATABASE_URL: postgresql://app:app@postgres:5432/app?sslmode=disable
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
     ports:
-      - "8080:8080"
+      - "18080:8080"
     depends_on:
       postgres:
         condition: service_healthy
