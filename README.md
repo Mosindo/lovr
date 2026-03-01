@@ -2,7 +2,7 @@
 
 Structure:
 - `apps/mobile` : Expo + TypeScript, 2 ecrans (Discover / Matches)
-- `services/api` : API Go minimale avec `GET /health`
+- `services/api` : API Go (Gin) avec health + auth JWT
 - `infra/docker-compose.yml` : Postgres + API
 
 ## Prerequis
@@ -24,7 +24,12 @@ Verifier la sante de l'API:
 curl http://localhost:8080/health
 ```
 
-## 2) Lancer le mobile Expo
+## 2) Endpoints auth MVP
+- `POST /auth/register`
+- `POST /auth/login`
+- `GET /me` (header `Authorization: Bearer <token>`)
+
+## 3) Lancer le mobile Expo
 Dans un autre terminal:
 
 ```bash
@@ -40,5 +45,7 @@ API en local (sans Docker):
 
 ```bash
 cd services/api
+export DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
+export JWT_SECRET='change-me-in-dev'
 go run ./cmd/api
 ```
