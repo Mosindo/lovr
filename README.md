@@ -18,6 +18,22 @@ Depuis la racine du repo:
 docker compose -f infra/docker-compose.yml up --build
 ```
 
+Assurez-vous de definir `JWT_SECRET` avant le lancement.
+
+PowerShell:
+
+```powershell
+$env:JWT_SECRET='change-me-in-dev'
+docker compose -f infra/docker-compose.yml up --build
+```
+
+Bash:
+
+```bash
+export JWT_SECRET='change-me-in-dev'
+docker compose -f infra/docker-compose.yml up --build
+```
+
 Verifier la sante de l'API:
 
 ```bash
@@ -47,5 +63,14 @@ API en local (sans Docker):
 cd services/api
 export DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
 export JWT_SECRET='change-me-in-dev'
+go run ./cmd/api
+```
+
+PowerShell:
+
+```powershell
+cd services/api
+$env:DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
+$env:JWT_SECRET='change-me-in-dev'
 go run ./cmd/api
 ```

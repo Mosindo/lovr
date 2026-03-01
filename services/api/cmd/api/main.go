@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -69,8 +68,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	migrationsDir := filepath.Join("internal", "db", "migrations")
-	if err := db.RunMigrations(ctx, pool, migrationsDir); err != nil {
+	if err := db.RunMigrations(ctx, pool); err != nil {
 		log.Fatal(err)
 	}
 
