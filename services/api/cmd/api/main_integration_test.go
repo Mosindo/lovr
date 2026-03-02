@@ -21,6 +21,50 @@ type testResponse struct {
 	Body   []byte
 }
 
+type discoverUserResponse struct {
+	ID        string    `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type discoverResponse struct {
+	Users []discoverUserResponse `json:"users"`
+}
+
+type likeResponse struct {
+	Matched bool `json:"matched"`
+}
+
+type matchesResponse struct {
+	Matches []discoverUserResponse `json:"matches"`
+}
+
+type chatMessagePreview struct {
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type chatSummaryResponse struct {
+	User        discoverUserResponse `json:"user"`
+	LastMessage *chatMessagePreview  `json:"lastMessage,omitempty"`
+}
+
+type chatsResponse struct {
+	Chats []chatSummaryResponse `json:"chats"`
+}
+
+type chatMessageResponse struct {
+	ID              string    `json:"id"`
+	SenderUserID    string    `json:"senderUserId"`
+	RecipientUserID string    `json:"recipientUserId"`
+	Content         string    `json:"content"`
+	CreatedAt       time.Time `json:"createdAt"`
+}
+
+type chatMessagesResponse struct {
+	Messages []chatMessageResponse `json:"messages"`
+}
+
 func TestHealthEndpoint(t *testing.T) {
 	router, pool := setupTestRouter(t)
 	defer pool.Close()

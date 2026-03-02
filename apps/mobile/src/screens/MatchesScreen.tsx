@@ -58,14 +58,14 @@ export default function MatchesScreen({ token }: MatchesScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.header} testID="matches-screen">
         <Text style={styles.title}>Matches</Text>
-        <Pressable onPress={load}>
+        <Pressable onPress={load} testID="matches-reload-button">
           <Text style={styles.reload}>Reload</Text>
         </Pressable>
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      {feedback ? <Text style={styles.feedback} testID="matches-feedback">{feedback}</Text> : null}
 
       <FlatList
         contentContainerStyle={styles.list}
@@ -76,7 +76,7 @@ export default function MatchesScreen({ token }: MatchesScreenProps) {
           <View style={styles.card}>
             <Text style={styles.email}>{item.email}</Text>
             <Text style={styles.id}>{item.id}</Text>
-            <Pressable onPress={() => onBlock(item)} style={styles.blockButton}>
+            <Pressable onPress={() => onBlock(item)} style={styles.blockButton} testID={`matches-block-${item.id}`}>
               <Text style={styles.blockText}>Block</Text>
             </Pressable>
           </View>

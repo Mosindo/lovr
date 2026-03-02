@@ -61,6 +61,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           onChangeText={setEmail}
           placeholder="Email"
           style={styles.input}
+          testID="auth-email-input"
           value={email}
         />
 
@@ -70,12 +71,13 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
           placeholder="Password"
           secureTextEntry
           style={styles.input}
+          testID="auth-password-input"
           value={password}
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <Pressable disabled={submitting} onPress={onSubmit} style={styles.button}>
+        <Pressable disabled={submitting} onPress={onSubmit} style={styles.button} testID="auth-submit-button">
           {submitting ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
@@ -89,6 +91,7 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
             setMode((prev) => (prev === "login" ? "register" : "login"));
             setError(null);
           }}
+          testID="auth-switch-mode-button"
         >
           <Text style={styles.switchText}>{switchLabel}</Text>
         </Pressable>

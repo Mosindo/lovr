@@ -9,7 +9,7 @@ type AccountScreenProps = {
 
 export default function AccountScreen({ user, onLogout }: AccountScreenProps) {
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="account-screen">
       <View style={styles.card}>
         <Text style={styles.title}>Account</Text>
         <Text style={styles.label}>Email</Text>
@@ -18,7 +18,7 @@ export default function AccountScreen({ user, onLogout }: AccountScreenProps) {
         <Text style={styles.label}>User ID</Text>
         <Text style={styles.value}>{user.id}</Text>
 
-        <Pressable onPress={onLogout} style={styles.button}>
+        <Pressable onPress={onLogout} style={styles.button} testID="account-logout-button">
           <Text style={styles.buttonText}>Logout</Text>
         </Pressable>
       </View>

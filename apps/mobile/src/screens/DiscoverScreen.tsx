@@ -67,15 +67,15 @@ export default function DiscoverScreen({ token }: DiscoverScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.header} testID="discover-screen">
         <Text style={styles.title}>Discover</Text>
-        <Pressable onPress={load}>
+        <Pressable onPress={load} testID="discover-reload-button">
           <Text style={styles.reload}>Reload</Text>
         </Pressable>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      {feedback ? <Text style={styles.feedback} testID="discover-feedback">{feedback}</Text> : null}
 
       <FlatList
         contentContainerStyle={styles.list}
@@ -87,10 +87,10 @@ export default function DiscoverScreen({ token }: DiscoverScreenProps) {
             <Text style={styles.email}>{item.email}</Text>
             <Text style={styles.id}>{item.id}</Text>
             <View style={styles.actions}>
-              <Pressable onPress={() => onLike(item)} style={styles.likeButton}>
+              <Pressable onPress={() => onLike(item)} style={styles.likeButton} testID={`discover-like-${item.id}`}>
                 <Text style={styles.likeText}>Like</Text>
               </Pressable>
-              <Pressable onPress={() => onBlock(item)} style={styles.blockButton}>
+              <Pressable onPress={() => onBlock(item)} style={styles.blockButton} testID={`discover-block-${item.id}`}>
                 <Text style={styles.blockText}>Block</Text>
               </Pressable>
             </View>

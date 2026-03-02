@@ -152,7 +152,7 @@ Regles obligatoires pour eviter les incidents observes:
    - fichiers modifies complets (si demande)
    - sorties build/test
    - nouvelles dependances
-
+6. - Aucune nouvelle fonctionnalité ne doit être ajoutée tant que les tâches marquées comme prioritaires dans PROJECT_STATUS.md ne sont pas terminées et validées.
 ---
 
 # INTERDIT

@@ -19,7 +19,6 @@ build/
 # Environment files
 .env
 .env.*
-!.env.example
 
 # IDE/editor files
 .vscode/
@@ -38,3 +37,6 @@ pnpm-debug.log*
 *.pid
 *.pid.lock
 docker-data/
+
+# Mobile e2e runtime artifacts
+apps/mobile/.e2e/

@@ -15,10 +15,10 @@ Lovr est une application de rencontre "human-first" orientee confiance et securi
 | Domaine | Avancement | Notes |
 |---|---:|---|
 | Produit MVP (core flows) | 70% | Flows essentiels disponibles, hardening restant |
-| Backend API | 78% | Auth, discover, likes/matches, block, chat presentes |
+| Backend API | 86% | Flows MVP presents + modularisation Auth/Social/Chat vers handlers/services |
 | Base de donnees & migrations | 72% | Schema MVP en place, modeles futurs a consolider |
-| Mobile App | 68% | Auth + discover + matches + block + chat UI disponibles |
-| Tests & qualite | 65% | Tests integration backend en place, e2e mobile a ajouter |
+| Mobile App | 74% | Auth + discover + matches + block + chat UI + polling conversation/listing |
+| Tests & qualite | 85% | Tests integration API + services + smoke e2e mobile + base e2e UI Maestro |
 | DevOps / exploitation locale | 70% | Docker local stable, checklist runbook a renforcer |
 
 ## 4. Backend
@@ -43,7 +43,9 @@ Lovr est une application de rencontre "human-first" orientee confiance et securi
 - [x] Migrations executees au demarrage
 - [x] Verification interaction bloquee avant like/chat
 - [x] Tests integration backend (auth/social/chat)
-- [ ] Separation handlers/services/repositories (main.go encore volumineux)
+- [x] Tests integration couche services (Auth/Social/Chat)
+- [x] Separation handlers/services effective (Auth/Social/Chat extraits de `main.go`)
+- [ ] Couche repository dediee (SQL encore dans services)
 - [ ] Observabilite (logs structures, metriques)
 - [ ] Pagination/limites robustes pour discover/chat
 
@@ -75,20 +77,22 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 - [x] Gestion erreurs reseau de base (timeout + message)
 
 ### Taches Prevues
-- [ ] Polling auto des messages (ou websocket)
+- [x] Polling auto des messages (mode polling intervalle sur ecran chat)
 - [ ] UX loading/error states plus robustes
 - [ ] Ecrans profil + edition
 - [ ] Validation UX mobile multi-device (Android/iOS)
-- [ ] Tests UI/e2e (detox/expo tests)
+- [x] Smoke e2e mobile parcours critique (script `npm run e2e:smoke`)
+- [x] Base tests UI/e2e device (Maestro flow + setup fixtures + testIDs)
+- [ ] Execution CI/device des tests UI/e2e (Detox/Maestro)
 
 ## 7. Problemes Techniques Ouverts
 - Conflits possibles de port local (ex: `8080` pris par Apache/IIS/WSL)
 - Configuration reseau mobile physique dependante de `EXPO_PUBLIC_API_URL`
-- `main.go` concentre encore beaucoup de logique applicative
+- Absence de couche repository (SQL encore en services)
 - Couverture tests forte backend, faible mobile
 
 ## 8. Prochaine Priorite
-Stabilisation du chat en mobile (polling temps reel + UX conversation), puis extraction progressive de la logique backend hors `main.go` sans regression.
+Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox) et stabilisation UX chat (loading/error/retry), puis mise en place progressive d'une couche repository backend.
 
 ## 9. Risques Techniques
 - Regression fonctionnelle lors du futur decoupage backend
@@ -105,6 +109,8 @@ Stabilisation du chat en mobile (polling temps reel + UX conversation), puis ext
 - Blocage atomique avec suppression des interactions bidirectionnelles
 - Chat autorise uniquement apres match reciproque et hors blocage
 - Port host API dedie (`18080`) pour eviter conflits locaux
+- Modularisation backend par domaines (`auth`, `social`, `chat`) via handlers/services
+- Standardisation projet: utilisation de `.env` uniquement (suppression `.env.example`)
 
 ## 11. Date de Derniere Mise a Jour
-2026-03-01
+2026-03-02

@@ -24,6 +24,9 @@ type ChatsScreenProps = {
   currentUserId: string;
 };
 
+const CHAT_LIST_POLL_MS = 8000;
+const CHAT_MESSAGES_POLL_MS = 3000;
+
 export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) {
   const [chatList, setChatList] = useState<ChatSummary[]>([]);
   const [selectedChat, setSelectedChat] = useState<ChatSummary | null>(null);
@@ -33,8 +36,10 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  const loadChats = useCallback(async () => {
-    setLoading(true);
+  const loadChats = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     try {
       const nextChats = await chats(token);
@@ -48,13 +53,17 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "could not load chats");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [token]);
 
   const loadMessages = useCallback(
-    async (chat: ChatSummary): Promise<boolean> => {
-      setLoading(true);
+    async (chat: ChatSummary, silent = false): Promise<boolean> => {
+      if (!silent) {
+        setLoading(true);
+      }
       setError(null);
       try {
         const nextMessages = await chatMessages(token, chat.user.id);
@@ -64,7 +73,9 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
         setError(loadError instanceof Error ? loadError.message : "could not load messages");
         return false;
       } finally {
-        setLoading(false);
+        if (!silent) {
+          setLoading(false);
+        }
       }
     },
     [token]
@@ -99,7 +110,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
       const sent = await sendChatMessage(token, selectedChat.user.id, content);
       setMessages((prev) => [...prev, sent]);
       setDraft("");
-      await loadChats();
+      await loadChats(true);
     } catch (sendError) {
       setError(sendError instanceof Error ? sendError.message : "could not send message");
     } finally {
@@ -107,11 +118,40 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
     }
   }
 
+  useEffect(() => {
+    if (selectedChat) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      void loadChats(true);
+    }, CHAT_LIST_POLL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [selectedChat, loadChats]);
+
+  useEffect(() => {
+    if (!selectedChat) {
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      void loadMessages(selectedChat, true);
+      void loadChats(true);
+    }, CHAT_MESSAGES_POLL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [selectedChat, loadMessages, loadChats]);
+
   const title = useMemo(() => (selectedChat ? selectedChat.user.email : "Chats"), [selectedChat]);
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={styles.header} testID="chats-screen">
         {selectedChat ? (
           <Pressable
             onPress={() => {
@@ -119,6 +159,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
               setMessages([]);
               setError(null);
             }}
+            testID="chats-back-button"
           >
             <Text style={styles.back}>Back</Text>
           </Pressable>
@@ -136,6 +177,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
               await loadChats();
             }
           }}
+          testID="chats-reload-button"
         >
           <Text style={styles.reload}>Reload</Text>
         </Pressable>
@@ -170,9 +212,10 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
               onChangeText={setDraft}
               placeholder="Write a message..."
               style={styles.input}
+              testID="chats-message-input"
               value={draft}
             />
-            <Pressable disabled={sending} onPress={onSend} style={styles.sendButton}>
+            <Pressable disabled={sending} onPress={onSend} style={styles.sendButton} testID="chats-send-button">
               <Text style={styles.sendText}>{sending ? "..." : "Send"}</Text>
             </Pressable>
           </View>
@@ -184,7 +227,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
           keyExtractor={(item) => item.user.id}
           ListEmptyComponent={<Text style={styles.empty}>No chats yet. Create a match first.</Text>}
           renderItem={({ item }) => (
-            <Pressable onPress={() => openChat(item)} style={styles.chatCard}>
+            <Pressable onPress={() => openChat(item)} style={styles.chatCard} testID={`chats-open-${item.user.id}`}>
               <Text style={styles.chatEmail}>{item.user.email}</Text>
               <Text style={styles.chatPreview}>{item.lastMessage?.content ?? "No messages yet"}</Text>
             </Pressable>

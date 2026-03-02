@@ -1,0 +1,40 @@
+appId: ${APP_ID}
+name: Lovr Critical Flow
+---
+- launchApp:
+    clearState: true
+
+- assertVisible: Login
+- tapOn:
+    id: auth-email-input
+- inputText: ${TEST_EMAIL}
+- tapOn:
+    id: auth-password-input
+- inputText: ${TEST_PASSWORD}
+- tapOn:
+    id: auth-submit-button
+
+- assertVisible:
+    id: discover-screen
+
+- tapOn: Matches
+- assertVisible:
+    id: matches-screen
+- assertVisible: ${MATCH_EMAIL}
+
+- tapOn: Chats
+- assertVisible:
+    id: chats-screen
+- tapOn: ${MATCH_EMAIL}
+- tapOn:
+    id: chats-message-input
+- inputText: maestro ui ping
+- tapOn:
+    id: chats-send-button
+- assertVisible: maestro ui ping
+
+- tapOn:
+    id: chats-back-button
+- tapOn: Matches
+- tapOn: Block
+- assertNotVisible: ${MATCH_EMAIL}

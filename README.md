@@ -5,6 +5,20 @@ Structure:
 - `services/api` : API Go (Gin) avec health + auth JWT
 - `infra/docker-compose.yml` : Postgres + API
 
+## Etat Actuel (2026-03-02)
+- Backend MVP fonctionnel: auth, discover, likes/matches, block atomique, chat.
+- API backend modularisee par domaines:
+  - `internal/auth` (JWT + middleware)
+  - `internal/services` (logique metier)
+  - `internal/handlers` (couche HTTP)
+- `cmd/api/main.go` conserve un role de composition (wiring + routes).
+- Configuration projet standardisee sur `.env` (pas de `.env.example`).
+
+## Roadmap Immediate
+- Mobile: polling conversation (ou websocket) pour chat quasi temps reel.
+- Qualite: ajouter tests unitaires services backend + e2e mobile parcours critiques.
+- Backend: introduire progressivement une couche repository (SQL explicite conserve).
+
 ## Prerequis
 - Node.js 18+
 - npm
@@ -37,7 +51,7 @@ docker compose -f infra/docker-compose.yml up --build
 Verifier la sante de l'API:
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 ```
 
 ## 2) Endpoints auth MVP
@@ -74,3 +88,32 @@ $env:DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
 $env:JWT_SECRET='change-me-in-dev'
 go run ./cmd/api
 ```
+
+Smoke e2e mobile (parcours critique via API client mobile):
+
+```bash
+cd apps/mobile
+npm run e2e:smoke
+```
+
+Variable optionnelle:
+- `MOBILE_E2E_API_URL` (sinon fallback `EXPO_PUBLIC_API_URL`, puis `http://localhost:18080`)
+
+Setup e2e UI device (fixtures match pre-creees):
+
+```bash
+cd apps/mobile
+npm run e2e:ui:setup
+```
+
+Flow Maestro (si `maestro` est installe localement):
+
+PowerShell:
+
+```powershell
+cd apps/mobile
+npm run e2e:ui:run
+```
+
+Parametre optionnel du runner:
+- `-AppId` (ex: `host.exp.exponent` pour Expo Go)
