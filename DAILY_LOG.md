@@ -102,10 +102,26 @@
   - `internal/repositories/chat_repo.go`
 - Wiring recable dans `cmd/api/main.go`: `repositories -> services -> handlers`.
 - Comportement externe conserve (routes/payloads/codes HTTP inchanges).
+- Lot suivant lance: priorite `PROJECT_STATUS` executee partiellement:
+  - tentative d'execution e2e UI reelle via `npm run e2e:ui:run`
+  - stabilisation UX chat sur `ChatsScreen` (loading/error/retry) sans nouvelle feature.
+- Validation post-ajustements UX:
+  - `npx tsc --noEmit` OK
+  - `npm run e2e:smoke` OK
+  - `go test ./...` OK
+  - `go build ./cmd/api` OK
+- Automatisation smoke MVP courte ajoutee:
+  - `scripts/smoke-api.ps1` (API smoke automatise)
+  - `scripts/smoke-all.ps1` (orchestration globale)
+  - rapport automatique `./.smoke/report.txt` (PASS/FAIL)
+- Execution reelle validee:
+  - `powershell -ExecutionPolicy Bypass -File .\\scripts\\smoke-api.ps1` -> PASS
+  - `powershell -ExecutionPolicy Bypass -File .\\scripts\\smoke-all.ps1` -> PASS
 
 ### Problemes Rencontres
 - Un echec de compilation temporaire sur mapping de types Chat (`repositories.ChatMessage` vs `services.ChatMessage`), corrige sans impact externe.
 - Acces au cache build Go restreint dans l'environnement sandbox pour `go test`, necessitant execution avec permissions elevees.
+- Execution e2e UI bloquee localement par outillage manquant: commande `maestro` absente du PATH.
 
 ### Decisions Prises
 - Garder une extraction 1:1 minimale (pas de refactor cosmetique).

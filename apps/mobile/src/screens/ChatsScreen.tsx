@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -35,12 +35,18 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const chatsInFlight = useRef(false);
+  const messagesInFlight = useRef(false);
 
   const loadChats = useCallback(async (silent = false) => {
+    if (chatsInFlight.current) {
+      return;
+    }
+    chatsInFlight.current = true;
     if (!silent) {
       setLoading(true);
+      setError(null);
     }
-    setError(null);
     try {
       const nextChats = await chats(token);
       setChatList(nextChats);
@@ -51,31 +57,41 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
         return nextChats.find((chat) => chat.user.id === current.user.id) ?? null;
       });
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "could not load chats");
+      if (!silent) {
+        setError(loadError instanceof Error ? loadError.message : "could not load chats");
+      }
     } finally {
       if (!silent) {
         setLoading(false);
       }
+      chatsInFlight.current = false;
     }
   }, [token]);
 
   const loadMessages = useCallback(
     async (chat: ChatSummary, silent = false): Promise<boolean> => {
+      if (messagesInFlight.current) {
+        return false;
+      }
+      messagesInFlight.current = true;
       if (!silent) {
         setLoading(true);
+        setError(null);
       }
-      setError(null);
       try {
         const nextMessages = await chatMessages(token, chat.user.id);
         setMessages(nextMessages);
         return true;
       } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "could not load messages");
+        if (!silent) {
+          setError(loadError instanceof Error ? loadError.message : "could not load messages");
+        }
         return false;
       } finally {
         if (!silent) {
           setLoading(false);
         }
+        messagesInFlight.current = false;
       }
     },
     [token]
@@ -183,7 +199,22 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
         </Pressable>
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? (
+        <View style={styles.errorWrap}>
+          <Text style={styles.error}>{error}</Text>
+          <Pressable
+            onPress={async () => {
+              if (selectedChat) {
+                await loadMessages(selectedChat);
+              } else {
+                await loadChats();
+              }
+            }}
+          >
+            <Text style={styles.retry}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {loading ? (
         <View style={styles.loaderWrap}>
@@ -295,8 +326,17 @@ const styles = StyleSheet.create({
     marginTop: 26
   },
   error: {
-    color: "#b91c1c",
-    marginBottom: 8
+    color: "#b91c1c"
+  },
+  errorWrap: {
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  retry: {
+    color: "#2563eb",
+    fontWeight: "700"
   },
   loaderWrap: {
     flex: 1,
