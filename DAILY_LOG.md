@@ -117,16 +117,25 @@
 - Execution reelle validee:
   - `powershell -ExecutionPolicy Bypass -File .\\scripts\\smoke-api.ps1` -> PASS
   - `powershell -ExecutionPolicy Bypass -File .\\scripts\\smoke-all.ps1` -> PASS
+- Stabilisation UX chat complementaire:
+  - correction d'un faux echec possible pendant `openChat` quand un fetch messages est deja en cours (`ChatsScreen`).
+  - revalidation mobile: `npx tsc --noEmit` OK, `npm run e2e:smoke` OK.
+- Outillage e2e UI prepare:
+  - installation locale de `maestro` dans `C:\Users\mosin\.maestro\bin`
+  - installation `adb` via `Google.PlatformTools`
+  - relance `npm run e2e:ui:run` avec setup fixtures OK.
 
 ### Problemes Rencontres
 - Un echec de compilation temporaire sur mapping de types Chat (`repositories.ChatMessage` vs `services.ChatMessage`), corrige sans impact externe.
 - Acces au cache build Go restreint dans l'environnement sandbox pour `go test`, necessitant execution avec permissions elevees.
 - Execution e2e UI bloquee localement par outillage manquant: commande `maestro` absente du PATH.
+- Execution e2e UI encore bloquee en run complet faute de device/emulateur connecte (`0 devices connected`).
 
 ### Decisions Prises
 - Garder une extraction 1:1 minimale (pas de refactor cosmetique).
 - Laisser les signatures handlers/services externes stables.
 - Valider apres chaque recablage domaine (Auth, puis Social, puis Chat).
+- Conserver la priorite QA: pas de nouvelle feature tant que l'execution e2e UI reelle n'est pas validee.
 
 ### Impact Estime Sur L'avancement
 - +12% sur la maintenabilite backend (separation data access / logique metier finalisee).
@@ -135,6 +144,7 @@
 ### Prochaine Action
 - Priorite suivante selon `PROJECT_STATUS.md`: execution reelle des tests e2e UI sur device/emulateur.
 - Puis stabilisation UX chat (loading/error/retry) sans ajout de feature.
+- Reprise: connecter un device/emulateur Android, verifier `adb devices`, puis relancer `npm run e2e:ui:run`.
 
 ---
 

@@ -71,7 +71,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
   const loadMessages = useCallback(
     async (chat: ChatSummary, silent = false): Promise<boolean> => {
       if (messagesInFlight.current) {
-        return false;
+        return true;
       }
       messagesInFlight.current = true;
       if (!silent) {
