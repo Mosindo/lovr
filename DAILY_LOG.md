@@ -138,12 +138,21 @@
   - propagation `X-Request-ID` sur `/health`.
   - couverture `limit` pour discover et messages chat.
   - validations OK: `go test ./...`, `go build ./cmd/api`, `npx tsc --noEmit`, `npm run e2e:smoke`.
+- Runs de reproductibilite executes:
+  - `scripts/smoke-api.ps1` x2 -> PASS.
+  - `npm run e2e:smoke` x2 -> PASS.
+- E2E UI device:
+  - environnement `maestro` + `adb` operationnel avec emulateurs detectes.
+  - execution complete reste instable/longue en session locale (timeouts/interruptions), sans verdict final fiable.
+- Orientation test UI:
+  - decision de preparer une migration progressive vers Detox (Maestro conserve en fallback hardening).
 
 ### Problemes Rencontres
 - Un echec de compilation temporaire sur mapping de types Chat (`repositories.ChatMessage` vs `services.ChatMessage`), corrige sans impact externe.
 - Acces au cache build Go restreint dans l'environnement sandbox pour `go test`, necessitant execution avec permissions elevees.
 - Execution e2e UI bloquee localement par outillage manquant: commande `maestro` absente du PATH.
 - Execution e2e UI encore bloquee en run complet faute de device/emulateur connecte (`0 devices connected`).
+- Even avec devices detectes, run UI long et fragile en local (contexte shell/permissions/sessions interrompues).
 
 ### Decisions Prises
 - Garder une extraction 1:1 minimale (pas de refactor cosmetique).
@@ -151,6 +160,7 @@
 - Valider apres chaque recablage domaine (Auth, puis Social, puis Chat).
 - Conserver la priorite QA: pas de nouvelle feature tant que l'execution e2e UI reelle n'est pas validee.
 - Ne pas toucher aux routes/payloads/codes HTTP pendant la stabilisation (uniquement UX chat + logs techniques).
+- Maintenir `smoke-api` + `e2e:smoke` comme gate MVP, et traiter UI e2e device comme bonus hardening.
 
 ### Impact Estime Sur L'avancement
 - +12% sur la maintenabilite backend (separation data access / logique metier finalisee).
@@ -159,6 +169,7 @@
 ### Prochaine Action
 - Priorite MVP en cours: finaliser stabilisation UX chat et observabilite backend (ajustements mineurs restants + revue tech lead).
 - Bonus phase 1: reprendre execution e2e UI reelle sur device/emulateur lorsque la session run longue est disponible.
+- Proposer plan minimal de migration Maestro -> Detox (sans changement produit) pour fiabiliser la QA UI.
 
 ---
 

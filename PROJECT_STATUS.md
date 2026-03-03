@@ -96,6 +96,7 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 - Conflits possibles de port local (ex: `8080` pris par Apache/IIS/WSL)
 - Configuration reseau mobile physique dependante de `EXPO_PUBLIC_API_URL`
 - Couverture tests forte backend, faible mobile
+- Instabilite d'execution e2e UI locale (Maestro/adb/HOME/permissions/sessions longues)
 
 ## 8. Prochaine Priorite
 - Stabilisation UX chat (loading/error/retry)
@@ -103,6 +104,7 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 
 ### Phase 1 – Bonus (Hardening technique)
 - Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox)
+- Trajectoire recommandee: migration progressive UI e2e vers Detox (Maestro conserve en fallback)
 
 ## 9. Risques Techniques
 - Regression fonctionnelle lors du futur decoupage backend
@@ -122,6 +124,7 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 - Modularisation backend par domaines (`auth`, `social`, `chat`) via handlers/services
 - Standardisation projet: utilisation de `.env` uniquement (suppression `.env.example`)
 - Couche repositories Postgres dediee (`internal/repositories`) pour sortir le SQL des services
+- Gate qualite MVP: prioriser smoke API/mobile automatises; UI e2e device en hardening technique
 
 ## 11. Date de Derniere Mise a Jour
 2026-03-03
