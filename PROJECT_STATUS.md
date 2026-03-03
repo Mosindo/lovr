@@ -98,7 +98,11 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 - Couverture tests forte backend, faible mobile
 
 ## 8. Prochaine Priorite
-Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox) et stabilisation UX chat (loading/error/retry).
+- Stabilisation UX chat (loading/error/retry)
+- Observabilite backend minimale (logs structures)
+
+### Phase 1 – Bonus (Hardening technique)
+- Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox)
 
 ## 9. Risques Techniques
 - Regression fonctionnelle lors du futur decoupage backend
