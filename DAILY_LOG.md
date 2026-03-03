@@ -124,6 +124,20 @@
   - installation locale de `maestro` dans `C:\Users\mosin\.maestro\bin`
   - installation `adb` via `Google.PlatformTools`
   - relance `npm run e2e:ui:run` avec setup fixtures OK.
+- Stabilisation UX chat renforcee (sans changement fonctionnel):
+  - desactivation des actions `Reload`/`Retry` pendant `loading` ou `sending` pour eviter les relances concurrentes.
+- Observabilite backend minimale ajoutee:
+  - middleware `request_id` (`X-Request-ID`) + logs HTTP structures (method/path/status/latency/client_ip/request_id).
+- Hardening backend additionnel:
+  - logs structures d'erreurs handlers (`Auth/Social/Chat`) et evenements metier sensibles (register/login/like/block/send).
+  - metriques HTTP minimales en memoire (count/latence moyenne/max) journalisees periodiquement.
+- Pagination/limites robustes (sans rupture API):
+  - `GET /discover?limit=` bornage service/repository (default 50, max 100).
+  - `GET /chats/:userId/messages?limit=` bornage service/repository (default 200, max 500).
+- Tests integration et non-regression ajoutes:
+  - propagation `X-Request-ID` sur `/health`.
+  - couverture `limit` pour discover et messages chat.
+  - validations OK: `go test ./...`, `go build ./cmd/api`, `npx tsc --noEmit`, `npm run e2e:smoke`.
 
 ### Problemes Rencontres
 - Un echec de compilation temporaire sur mapping de types Chat (`repositories.ChatMessage` vs `services.ChatMessage`), corrige sans impact externe.
@@ -136,15 +150,15 @@
 - Laisser les signatures handlers/services externes stables.
 - Valider apres chaque recablage domaine (Auth, puis Social, puis Chat).
 - Conserver la priorite QA: pas de nouvelle feature tant que l'execution e2e UI reelle n'est pas validee.
+- Ne pas toucher aux routes/payloads/codes HTTP pendant la stabilisation (uniquement UX chat + logs techniques).
 
 ### Impact Estime Sur L'avancement
 - +12% sur la maintenabilite backend (separation data access / logique metier finalisee).
 - +8% sur la reduction du risque de regression lors des evolutions futures backend.
 
 ### Prochaine Action
-- Priorite suivante selon `PROJECT_STATUS.md`: execution reelle des tests e2e UI sur device/emulateur.
-- Puis stabilisation UX chat (loading/error/retry) sans ajout de feature.
-- Reprise: connecter un device/emulateur Android, verifier `adb devices`, puis relancer `npm run e2e:ui:run`.
+- Priorite MVP en cours: finaliser stabilisation UX chat et observabilite backend (ajustements mineurs restants + revue tech lead).
+- Bonus phase 1: reprendre execution e2e UI reelle sur device/emulateur lorsque la session run longue est disponible.
 
 ---
 

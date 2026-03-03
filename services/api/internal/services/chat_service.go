@@ -40,6 +40,11 @@ type ChatService struct {
 	repo repositories.ChatRepository
 }
 
+const (
+	defaultChatMessagesLimit = 200
+	maxChatMessagesLimit     = 500
+)
+
 func NewChatService(repo repositories.ChatRepository) *ChatService {
 	return &ChatService{repo: repo}
 }
@@ -70,11 +75,16 @@ func (s *ChatService) ListChats(ctx context.Context, userID string) ([]ChatSumma
 }
 
 func (s *ChatService) ListMessages(ctx context.Context, userID, otherUserID string) ([]ChatMessage, error) {
+	return s.ListMessagesWithLimit(ctx, userID, otherUserID, defaultChatMessagesLimit)
+}
+
+func (s *ChatService) ListMessagesWithLimit(ctx context.Context, userID, otherUserID string, limit int) ([]ChatMessage, error) {
 	if err := s.ensureCanChat(ctx, userID, otherUserID); err != nil {
 		return nil, err
 	}
 
-	messages, err := s.repo.ListMessages(ctx, userID, otherUserID, 200)
+	normalizedLimit := normalizeChatMessagesLimit(limit)
+	messages, err := s.repo.ListMessages(ctx, userID, otherUserID, normalizedLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -141,4 +151,14 @@ func (s *ChatService) ensureCanChat(ctx context.Context, userID, otherUserID str
 	}
 
 	return nil
+}
+
+func normalizeChatMessagesLimit(limit int) int {
+	if limit <= 0 {
+		return defaultChatMessagesLimit
+	}
+	if limit > maxChatMessagesLimit {
+		return maxChatMessagesLimit
+	}
+	return limit
 }

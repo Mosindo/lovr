@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	authmw "example.com/api/internal/auth"
@@ -42,6 +45,28 @@ type meResponse struct {
 	CreatedAt time.Time `json:"createdAt"`
 }
 
+type metricKey struct {
+	Method string
+	Path   string
+	Status int
+}
+
+type metricValue struct {
+	Count         int64
+	LatencyTotal  int64
+	LatencyMax    int64
+	LastUpdatedAt time.Time
+}
+
+type metricsStore struct {
+	mu   sync.Mutex
+	data map[metricKey]metricValue
+}
+
+var httpMetrics = metricsStore{
+	data: make(map[metricKey]metricValue),
+}
+
 func main() {
 	port := getenv("PORT", "8080")
 	databaseURL := os.Getenv("DATABASE_URL")
@@ -77,7 +102,11 @@ func main() {
 }
 
 func setupRouter(a *app) *gin.Engine {
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(requestIDMiddleware())
+	r.Use(requestMetricsMiddleware())
+	r.Use(requestLogger())
 	authRepo := repositories.NewPGAuthRepository(a.dbPool)
 	authService := services.NewAuthService(authRepo, a.jwtSecret)
 	authHandler := handlers.NewAuthHandler(authService)
@@ -101,6 +130,92 @@ func setupRouter(a *app) *gin.Engine {
 	r.GET("/chats/:userId/messages", requireUser, chatHandler.ChatMessages)
 	r.POST("/chats/:userId/messages", requireUser, chatHandler.SendChatMessage)
 	return r
+}
+
+func requestMetricsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		path := c.FullPath()
+		if path == "" {
+			path = c.Request.URL.Path
+		}
+		latency := time.Since(start).Milliseconds()
+		status := c.Writer.Status()
+		method := c.Request.Method
+
+		key := metricKey{Method: method, Path: path, Status: status}
+		httpMetrics.mu.Lock()
+		current := httpMetrics.data[key]
+		current.Count++
+		current.LatencyTotal += latency
+		if latency > current.LatencyMax {
+			current.LatencyMax = latency
+		}
+		current.LastUpdatedAt = time.Now().UTC()
+		httpMetrics.data[key] = current
+		total := current.Count
+		avg := int64(0)
+		if current.Count > 0 {
+			avg = current.LatencyTotal / current.Count
+		}
+		httpMetrics.mu.Unlock()
+
+		if total%50 == 0 {
+			log.Printf(
+				`{"event":"http_metric","method":%q,"path":%q,"status":%d,"count":%d,"avg_latency_ms":%d,"max_latency_ms":%d}`,
+				method,
+				path,
+				status,
+				total,
+				avg,
+				current.LatencyMax,
+			)
+		}
+	}
+}
+
+func requestLogger() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		c.Next()
+
+		path := c.FullPath()
+		if path == "" {
+			path = c.Request.URL.Path
+		}
+
+		log.Printf(
+			`{"event":"http_request","request_id":%q,"method":%q,"path":%q,"status":%d,"latency_ms":%d,"client_ip":%q}`,
+			c.GetString("request_id"),
+			c.Request.Method,
+			path,
+			c.Writer.Status(),
+			time.Since(start).Milliseconds(),
+			c.ClientIP(),
+		)
+	}
+}
+
+func requestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
+		c.Set("request_id", requestID)
+		c.Header("X-Request-ID", requestID)
+		c.Next()
+	}
+}
+
+func generateRequestID() string {
+	buf := make([]byte, 12)
+	if _, err := rand.Read(buf); err != nil {
+		return time.Now().UTC().Format("20060102150405.000000000")
+	}
+	return hex.EncodeToString(buf)
 }
 
 func (a *app) health(c *gin.Context) {

@@ -25,12 +25,22 @@ type SocialService struct {
 	repo repositories.SocialRepository
 }
 
+const (
+	defaultDiscoverLimit = 50
+	maxDiscoverLimit     = 100
+)
+
 func NewSocialService(repo repositories.SocialRepository) *SocialService {
 	return &SocialService{repo: repo}
 }
 
 func (s *SocialService) Discover(ctx context.Context, userID string) ([]DiscoverUser, error) {
-	users, err := s.repo.ListDiscoverUsers(ctx, userID, 50)
+	return s.DiscoverWithLimit(ctx, userID, defaultDiscoverLimit)
+}
+
+func (s *SocialService) DiscoverWithLimit(ctx context.Context, userID string, limit int) ([]DiscoverUser, error) {
+	normalizedLimit := normalizeDiscoverLimit(limit)
+	users, err := s.repo.ListDiscoverUsers(ctx, userID, normalizedLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +54,16 @@ func (s *SocialService) Discover(ctx context.Context, userID string) ([]Discover
 		})
 	}
 	return payload, nil
+}
+
+func normalizeDiscoverLimit(limit int) int {
+	if limit <= 0 {
+		return defaultDiscoverLimit
+	}
+	if limit > maxDiscoverLimit {
+		return maxDiscoverLimit
+	}
+	return limit
 }
 
 func (s *SocialService) Like(ctx context.Context, fromUserID, toUserID string) (bool, error) {

@@ -53,8 +53,8 @@ Lovr est une application de rencontre "human-first" orientee confiance et securi
 - [x] Tests integration couche services (Auth/Social/Chat)
 - [x] Separation handlers/services effective (Auth/Social/Chat extraits de `main.go`)
 - [x] Couche repository dediee (SQL extrait des services vers `internal/repositories`)
-- [ ] Observabilite (logs structures, metriques)
-- [ ] Pagination/limites robustes pour discover/chat
+- [x] Observabilite (logs structures, metriques)
+- [x] Pagination/limites robustes pour discover/chat
 
 ## 5. Base de Donnees
 
@@ -85,7 +85,7 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 
 ### Taches Prevues
 - [x] Polling auto des messages (mode polling intervalle sur ecran chat)
-- [ ] UX loading/error states plus robustes
+- [x] UX loading/error states plus robustes
 - [ ] Ecrans profil + edition
 - [ ] Validation UX mobile multi-device (Android/iOS)
 - [x] Smoke e2e mobile parcours critique (script `npm run e2e:smoke`)

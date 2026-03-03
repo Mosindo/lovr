@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,8 +51,10 @@ func NewSocialHandler(socialService *services.SocialService) *SocialHandler {
 
 func (h *SocialHandler) Discover(c *gin.Context) {
 	userID := c.GetString("userID")
-	users, err := h.socialService.Discover(c.Request.Context(), userID)
+	limit := parsePositiveInt(c.Query("limit"), 50)
+	users, err := h.socialService.DiscoverWithLimit(c.Request.Context(), userID, limit)
 	if err != nil {
+		logHandlerError(c, "social.discover", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch discover users"})
 		return
 	}
@@ -73,12 +76,14 @@ func (h *SocialHandler) Like(c *gin.Context) {
 
 	var req likeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logHandlerError(c, "social.like.bind", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	matched, err := h.socialService.Like(c.Request.Context(), userID, strings.TrimSpace(req.ToUserID))
 	if err != nil {
+		logHandlerError(c, "social.like", err)
 		switch {
 		case errors.Is(err, services.ErrCannotLikeSelf):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot like yourself"})
@@ -93,6 +98,10 @@ func (h *SocialHandler) Like(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, likeResponse{Matched: matched})
+	logHandlerEvent(c, "social.like.success", map[string]string{
+		"to_user_id": req.ToUserID,
+		"matched":    strconv.FormatBool(matched),
+	})
 }
 
 func (h *SocialHandler) Block(c *gin.Context) {
@@ -100,12 +109,14 @@ func (h *SocialHandler) Block(c *gin.Context) {
 
 	var req blockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logHandlerError(c, "social.block.bind", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	err := h.socialService.Block(c.Request.Context(), userID, strings.TrimSpace(req.ToUserID))
 	if err != nil {
+		logHandlerError(c, "social.block", err)
 		switch {
 		case errors.Is(err, services.ErrCannotBlockSelf):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot block yourself"})
@@ -118,12 +129,16 @@ func (h *SocialHandler) Block(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, blockResponse{Blocked: true})
+	logHandlerEvent(c, "social.block.success", map[string]string{
+		"blocked_user_id": req.ToUserID,
+	})
 }
 
 func (h *SocialHandler) Matches(c *gin.Context) {
 	userID := c.GetString("userID")
 	matches, err := h.socialService.Matches(c.Request.Context(), userID)
 	if err != nil {
+		logHandlerError(c, "social.matches", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch matches"})
 		return
 	}
@@ -138,4 +153,15 @@ func (h *SocialHandler) Matches(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, matchesResponse{Matches: payload})
+}
+
+func parsePositiveInt(raw string, fallback int) int {
+	if strings.TrimSpace(raw) == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(strings.TrimSpace(raw))
+	if err != nil || parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }

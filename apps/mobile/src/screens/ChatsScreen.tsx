@@ -27,6 +27,20 @@ type ChatsScreenProps = {
 const CHAT_LIST_POLL_MS = 8000;
 const CHAT_MESSAGES_POLL_MS = 3000;
 
+function formatChatError(error: unknown, fallback: string): string {
+  if (!(error instanceof Error) || !error.message) {
+    return fallback;
+  }
+  const message = error.message.toLowerCase();
+  if (message.includes("network") || message.includes("failed to fetch")) {
+    return "Network error. Check connection and retry.";
+  }
+  if (message.includes("timeout")) {
+    return "Request timed out. Please retry.";
+  }
+  return error.message;
+}
+
 export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) {
   const [chatList, setChatList] = useState<ChatSummary[]>([]);
   const [selectedChat, setSelectedChat] = useState<ChatSummary | null>(null);
@@ -58,7 +72,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
       });
     } catch (loadError) {
       if (!silent) {
-        setError(loadError instanceof Error ? loadError.message : "could not load chats");
+        setError(formatChatError(loadError, "could not load chats"));
       }
     } finally {
       if (!silent) {
@@ -84,7 +98,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
         return true;
       } catch (loadError) {
         if (!silent) {
-          setError(loadError instanceof Error ? loadError.message : "could not load messages");
+          setError(formatChatError(loadError, "could not load messages"));
         }
         return false;
       } finally {
@@ -128,7 +142,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
       setDraft("");
       await loadChats(true);
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : "could not send message");
+      setError(formatChatError(sendError, "could not send message"));
     } finally {
       setSending(false);
     }
@@ -186,6 +200,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
         <Text style={styles.title}>{title}</Text>
 
         <Pressable
+          disabled={loading || sending}
           onPress={async () => {
             if (selectedChat) {
               await loadMessages(selectedChat);
@@ -195,7 +210,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
           }}
           testID="chats-reload-button"
         >
-          <Text style={styles.reload}>Reload</Text>
+          <Text style={[styles.reload, loading || sending ? styles.reloadDisabled : null]}>Reload</Text>
         </Pressable>
       </View>
 
@@ -203,6 +218,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
         <View style={styles.errorWrap}>
           <Text style={styles.error}>{error}</Text>
           <Pressable
+            disabled={loading || sending}
             onPress={async () => {
               if (selectedChat) {
                 await loadMessages(selectedChat);
@@ -211,7 +227,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
               }
             }}
           >
-            <Text style={styles.retry}>Retry</Text>
+            <Text style={[styles.retry, loading || sending ? styles.retryDisabled : null]}>Retry</Text>
           </Pressable>
         </View>
       ) : null}
@@ -258,7 +274,12 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
           keyExtractor={(item) => item.user.id}
           ListEmptyComponent={<Text style={styles.empty}>No chats yet. Create a match first.</Text>}
           renderItem={({ item }) => (
-            <Pressable onPress={() => openChat(item)} style={styles.chatCard} testID={`chats-open-${item.user.id}`}>
+            <Pressable
+              disabled={loading || sending}
+              onPress={() => openChat(item)}
+              style={[styles.chatCard, loading || sending ? styles.chatCardDisabled : null]}
+              testID={`chats-open-${item.user.id}`}
+            >
               <Text style={styles.chatEmail}>{item.user.email}</Text>
               <Text style={styles.chatPreview}>{item.lastMessage?.content ?? "No messages yet"}</Text>
             </Pressable>
@@ -302,6 +323,9 @@ const styles = StyleSheet.create({
     width: 42,
     textAlign: "right"
   },
+  reloadDisabled: {
+    color: "#93c5fd"
+  },
   list: {
     paddingBottom: 24
   },
@@ -311,6 +335,9 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     elevation: 2
+  },
+  chatCardDisabled: {
+    opacity: 0.7
   },
   chatEmail: {
     fontWeight: "700",
@@ -337,6 +364,9 @@ const styles = StyleSheet.create({
   retry: {
     color: "#2563eb",
     fontWeight: "700"
+  },
+  retryDisabled: {
+    color: "#93c5fd"
   },
   loaderWrap: {
     flex: 1,

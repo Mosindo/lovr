@@ -78,6 +78,23 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
+func TestHealthPropagatesRequestID(t *testing.T) {
+	router, pool := setupTestRouter(t)
+	defer pool.Close()
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req.Header.Set("X-Request-ID", "req-integration-fixed-id")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("X-Request-ID"); got != "req-integration-fixed-id" {
+		t.Fatalf("expected response X-Request-ID to match input, got %q", got)
+	}
+}
+
 func TestAuthAndSocialFlow(t *testing.T) {
 	router, pool := setupTestRouter(t)
 	defer pool.Close()
@@ -367,6 +384,100 @@ func TestChatFlowRequiresMatchAndRespectsBlock(t *testing.T) {
 	getAfterBlock := doRequest(t, router, http.MethodGet, "/chats/"+auth2.User.ID+"/messages", nil, auth1.Token)
 	if getAfterBlock.Status != http.StatusForbidden {
 		t.Fatalf("get messages after block expected 403, got %d body=%s", getAfterBlock.Status, string(getAfterBlock.Body))
+	}
+}
+
+func TestDiscoverSupportsLimitQuery(t *testing.T) {
+	router, pool := setupTestRouter(t)
+	defer pool.Close()
+
+	password := "Password123"
+	emails := []string{
+		uniqueEmail("discover_limit_a"),
+		uniqueEmail("discover_limit_b"),
+		uniqueEmail("discover_limit_c"),
+		uniqueEmail("discover_limit_d"),
+	}
+	defer cleanupUsers(t, pool, emails)
+
+	regA := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{"email": emails[0], "password": password}, "")
+	regB := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{"email": emails[1], "password": password}, "")
+	regC := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{"email": emails[2], "password": password}, "")
+	regD := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{"email": emails[3], "password": password}, "")
+	if regA.Status != http.StatusCreated || regB.Status != http.StatusCreated || regC.Status != http.StatusCreated || regD.Status != http.StatusCreated {
+		t.Fatalf("registers expected 201, got [%d, %d, %d, %d]", regA.Status, regB.Status, regC.Status, regD.Status)
+	}
+
+	var authA authResponse
+	if err := json.Unmarshal(regA.Body, &authA); err != nil {
+		t.Fatalf("unmarshal authA: %v", err)
+	}
+
+	discoverLimited := doRequest(t, router, http.MethodGet, "/discover?limit=1", nil, authA.Token)
+	if discoverLimited.Status != http.StatusOK {
+		t.Fatalf("discover with limit expected 200, got %d body=%s", discoverLimited.Status, string(discoverLimited.Body))
+	}
+	var payload discoverResponse
+	if err := json.Unmarshal(discoverLimited.Body, &payload); err != nil {
+		t.Fatalf("unmarshal discover limited: %v", err)
+	}
+	if len(payload.Users) > 1 {
+		t.Fatalf("expected discover to return at most 1 user, got %d", len(payload.Users))
+	}
+}
+
+func TestChatMessagesSupportsLimitQuery(t *testing.T) {
+	router, pool := setupTestRouter(t)
+	defer pool.Close()
+
+	email1 := uniqueEmail("chat_limit_1")
+	email2 := uniqueEmail("chat_limit_2")
+	password := "Password123"
+	defer cleanupUsers(t, pool, []string{email1, email2})
+
+	register1 := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{
+		"email":    email1,
+		"password": password,
+	}, "")
+	register2 := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{
+		"email":    email2,
+		"password": password,
+	}, "")
+	if register1.Status != http.StatusCreated || register2.Status != http.StatusCreated {
+		t.Fatalf("registers expected 201, got [%d, %d]", register1.Status, register2.Status)
+	}
+
+	var auth1 authResponse
+	var auth2 authResponse
+	if err := json.Unmarshal(register1.Body, &auth1); err != nil {
+		t.Fatalf("unmarshal register1: %v", err)
+	}
+	if err := json.Unmarshal(register2.Body, &auth2); err != nil {
+		t.Fatalf("unmarshal register2: %v", err)
+	}
+
+	like1 := doRequest(t, router, http.MethodPost, "/likes", map[string]string{"toUserId": auth2.User.ID}, auth1.Token)
+	like2 := doRequest(t, router, http.MethodPost, "/likes", map[string]string{"toUserId": auth1.User.ID}, auth2.Token)
+	if like1.Status != http.StatusOK || like2.Status != http.StatusOK {
+		t.Fatalf("expected reciprocal likes to succeed, got [%d, %d]", like1.Status, like2.Status)
+	}
+
+	send1 := doRequest(t, router, http.MethodPost, "/chats/"+auth2.User.ID+"/messages", map[string]string{"content": "m1"}, auth1.Token)
+	send2 := doRequest(t, router, http.MethodPost, "/chats/"+auth2.User.ID+"/messages", map[string]string{"content": "m2"}, auth1.Token)
+	if send1.Status != http.StatusCreated || send2.Status != http.StatusCreated {
+		t.Fatalf("send messages expected 201, got [%d, %d]", send1.Status, send2.Status)
+	}
+
+	getMessages := doRequest(t, router, http.MethodGet, "/chats/"+auth2.User.ID+"/messages?limit=1", nil, auth1.Token)
+	if getMessages.Status != http.StatusOK {
+		t.Fatalf("get messages with limit expected 200, got %d body=%s", getMessages.Status, string(getMessages.Body))
+	}
+	var payload chatMessagesResponse
+	if err := json.Unmarshal(getMessages.Body, &payload); err != nil {
+		t.Fatalf("unmarshal messages payload: %v", err)
+	}
+	if len(payload.Messages) != 1 {
+		t.Fatalf("expected exactly 1 message with limit=1, got %d", len(payload.Messages))
 	}
 }
 

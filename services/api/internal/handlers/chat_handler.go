@@ -52,6 +52,7 @@ func (h *ChatHandler) Chats(c *gin.Context) {
 	userID := c.GetString("userID")
 	chats, err := h.chatService.ListChats(c.Request.Context(), userID)
 	if err != nil {
+		logHandlerError(c, "chat.list", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch chats"})
 		return
 	}
@@ -81,16 +82,20 @@ func (h *ChatHandler) ChatMessages(c *gin.Context) {
 	userID := c.GetString("userID")
 	otherUserID := strings.TrimSpace(c.Param("userId"))
 	if !isUUIDLike(otherUserID) {
+		logHandlerError(c, "chat.messages.validate_user_id", errors.New("invalid user id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 	if otherUserID == userID {
+		logHandlerError(c, "chat.messages.validate_self", errors.New("cannot open self chat"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot open self chat"})
 		return
 	}
 
-	messages, err := h.chatService.ListMessages(c.Request.Context(), userID, otherUserID)
+	limit := parsePositiveInt(c.Query("limit"), 200)
+	messages, err := h.chatService.ListMessagesWithLimit(c.Request.Context(), userID, otherUserID, limit)
 	if err != nil {
+		logHandlerError(c, "chat.messages", err)
 		switch {
 		case errors.Is(err, services.ErrValidateChatTarget):
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not validate chat target"})
@@ -126,22 +131,26 @@ func (h *ChatHandler) SendChatMessage(c *gin.Context) {
 	userID := c.GetString("userID")
 	otherUserID := strings.TrimSpace(c.Param("userId"))
 	if !isUUIDLike(otherUserID) {
+		logHandlerError(c, "chat.send.validate_user_id", errors.New("invalid user id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 	if otherUserID == userID {
+		logHandlerError(c, "chat.send.validate_self", errors.New("cannot message yourself"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot message yourself"})
 		return
 	}
 
 	var req sendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logHandlerError(c, "chat.send.bind", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	message, err := h.chatService.SendMessage(c.Request.Context(), userID, otherUserID, req.Content)
 	if err != nil {
+		logHandlerError(c, "chat.send", err)
 		switch {
 		case errors.Is(err, services.ErrValidateChatTarget):
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not validate chat target"})
@@ -167,6 +176,10 @@ func (h *ChatHandler) SendChatMessage(c *gin.Context) {
 		RecipientUserID: message.RecipientUserID,
 		Content:         message.Content,
 		CreatedAt:       message.CreatedAt,
+	})
+	logHandlerEvent(c, "chat.send.success", map[string]string{
+		"recipient_user_id": otherUserID,
+		"message_id":        message.ID,
 	})
 }
 
