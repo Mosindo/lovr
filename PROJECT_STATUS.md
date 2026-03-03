@@ -21,11 +21,12 @@ Lovr est une application de rencontre "human-first" orientee confiance et securi
 | Tests & qualite | 85% | Tests integration API + services + smoke e2e mobile + base e2e UI Maestro |
 | DevOps / exploitation locale | 70% | Docker local stable, checklist runbook a renforcer |
 
-### Smoke tests (MVP court)
-- [x] Smoke test API automatisé (checklist MVP courte)
-- [x] Smoke test mobile e2e (parcours critique)
+### Smoke tests MVP (checklist courte)
+
+- [x] Smoke test API automatisé (auth → discover → like/match → chat → block)
+- [x] Smoke test mobile e2e (parcours critique complet)
 - [x] Script orchestration "smoke_all"
-- [x] Rapport automatique PASS/FAIL
+- [x] Rapport automatique PASS/FAIL généré
 
 ## 4. Backend
 
