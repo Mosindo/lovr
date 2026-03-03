@@ -88,6 +88,81 @@
 
 ## Template Quotidien
 
+## 2026-03-03
+
+### Fait Aujourd'hui
+- Priorite unique executee: mise en place de la couche `internal/repositories` pour `Auth/Social/Chat`.
+- SQL extrait des services metier:
+  - `internal/services/auth_service.go`
+  - `internal/services/social_service.go`
+  - `internal/services/chat_service.go`
+- Repositories Postgres ajoutes:
+  - `internal/repositories/auth_repo.go`
+  - `internal/repositories/social_repo.go`
+  - `internal/repositories/chat_repo.go`
+- Wiring recable dans `cmd/api/main.go`: `repositories -> services -> handlers`.
+- Comportement externe conserve (routes/payloads/codes HTTP inchanges).
+
+### Problemes Rencontres
+- Un echec de compilation temporaire sur mapping de types Chat (`repositories.ChatMessage` vs `services.ChatMessage`), corrige sans impact externe.
+- Acces au cache build Go restreint dans l'environnement sandbox pour `go test`, necessitant execution avec permissions elevees.
+
+### Decisions Prises
+- Garder une extraction 1:1 minimale (pas de refactor cosmetique).
+- Laisser les signatures handlers/services externes stables.
+- Valider apres chaque recablage domaine (Auth, puis Social, puis Chat).
+
+### Impact Estime Sur L'avancement
+- +12% sur la maintenabilite backend (separation data access / logique metier finalisee).
+- +8% sur la reduction du risque de regression lors des evolutions futures backend.
+
+### Prochaine Action
+- Priorite suivante selon `PROJECT_STATUS.md`: execution reelle des tests e2e UI sur device/emulateur.
+- Puis stabilisation UX chat (loading/error/retry) sans ajout de feature.
+
+---
+
+## 2026-03-03 (Plan de Travail)
+
+### Tache Prioritaire
+- Mettre en place la couche repository dediee backend (SQL sorti des services) sans changer le comportement API.
+
+### Objectif de la Journee
+- Stabiliser le MVP en separant clairement acces donnees et logique metier sur `Auth/Social/Chat`.
+
+### Plan (Matin / Apres-midi)
+- Matin:
+  - Definir interfaces repository minimales par domaine (`AuthRepository`, `SocialRepository`, `ChatRepository`).
+  - Implementer repository Auth et recabler `AuthService`.
+  - Implementer repository Social et recabler `SocialService`.
+- Apres-midi:
+  - Implementer repository Chat et recabler `ChatService`.
+  - Ajuster le wiring `main.go` (repositories -> services -> handlers) sans changer routes/payloads.
+  - Lancer validations backend/mobile et corriger toute regression.
+  - Mettre a jour `PROJECT_STATUS.md` + `DAILY_LOG.md` en fin de journee.
+
+### Commandes de Validation
+- Backend:
+  - `cd services/api`
+  - `gofmt -w .`
+  - `go test ./...`
+  - `go build ./cmd/api`
+- Mobile:
+  - `cd apps/mobile`
+  - `npx tsc --noEmit`
+  - `npm run e2e:smoke`
+
+### Definition de Done
+- SQL retire des services et centralise en repositories dedies.
+- Contrats API inchanges (comportements conserves).
+- Build/tests backend OK + checks mobile OK.
+- Statuts projet/journal mis a jour.
+
+### Risques
+- Regression de mapping erreurs service/repository.
+- Rupture tests integration si signatures changent.
+- Refactor trop large: rester strictement sur la stabilisation MVP.
+
 ## YYYY-MM-DD
 
 ### Fait Aujourd'hui

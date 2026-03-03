@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"example.com/api/internal/db"
+	"example.com/api/internal/repositories"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,7 +17,8 @@ func TestAuthServiceRegisterLoginMe(t *testing.T) {
 	pool := setupServicesTestDB(t)
 	defer pool.Close()
 
-	svc := NewAuthService(pool, []byte("services-test-secret"))
+	authRepo := repositories.NewPGAuthRepository(pool)
+	svc := NewAuthService(authRepo, []byte("services-test-secret"))
 	email := uniqueEmail("authsvc")
 	password := "Password123"
 	defer cleanupUsers(t, pool, []string{email})
@@ -71,8 +73,10 @@ func TestSocialServiceLikeMatchBlockFlow(t *testing.T) {
 	pool := setupServicesTestDB(t)
 	defer pool.Close()
 
-	authSvc := NewAuthService(pool, []byte("services-test-secret"))
-	socialSvc := NewSocialService(pool)
+	authRepo := repositories.NewPGAuthRepository(pool)
+	authSvc := NewAuthService(authRepo, []byte("services-test-secret"))
+	socialRepo := repositories.NewPGSocialRepository(pool)
+	socialSvc := NewSocialService(socialRepo)
 
 	email1 := uniqueEmail("social1")
 	email2 := uniqueEmail("social2")
@@ -155,9 +159,12 @@ func TestChatServiceFlowAndGuards(t *testing.T) {
 	pool := setupServicesTestDB(t)
 	defer pool.Close()
 
-	authSvc := NewAuthService(pool, []byte("services-test-secret"))
-	socialSvc := NewSocialService(pool)
-	chatSvc := NewChatService(pool)
+	authRepo := repositories.NewPGAuthRepository(pool)
+	authSvc := NewAuthService(authRepo, []byte("services-test-secret"))
+	socialRepo := repositories.NewPGSocialRepository(pool)
+	socialSvc := NewSocialService(socialRepo)
+	chatRepo := repositories.NewPGChatRepository(pool)
+	chatSvc := NewChatService(chatRepo)
 
 	email1 := uniqueEmail("chat1")
 	email2 := uniqueEmail("chat2")

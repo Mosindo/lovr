@@ -15,7 +15,7 @@ Lovr est une application de rencontre "human-first" orientee confiance et securi
 | Domaine | Avancement | Notes |
 |---|---:|---|
 | Produit MVP (core flows) | 70% | Flows essentiels disponibles, hardening restant |
-| Backend API | 86% | Flows MVP presents + modularisation Auth/Social/Chat vers handlers/services |
+| Backend API | 90% | Flows MVP presents + modularisation Auth/Social/Chat + couche repositories |
 | Base de donnees & migrations | 72% | Schema MVP en place, modeles futurs a consolider |
 | Mobile App | 74% | Auth + discover + matches + block + chat UI + polling conversation/listing |
 | Tests & qualite | 85% | Tests integration API + services + smoke e2e mobile + base e2e UI Maestro |
@@ -45,7 +45,7 @@ Lovr est une application de rencontre "human-first" orientee confiance et securi
 - [x] Tests integration backend (auth/social/chat)
 - [x] Tests integration couche services (Auth/Social/Chat)
 - [x] Separation handlers/services effective (Auth/Social/Chat extraits de `main.go`)
-- [ ] Couche repository dediee (SQL encore dans services)
+- [x] Couche repository dediee (SQL extrait des services vers `internal/repositories`)
 - [ ] Observabilite (logs structures, metriques)
 - [ ] Pagination/limites robustes pour discover/chat
 
@@ -88,11 +88,10 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 ## 7. Problemes Techniques Ouverts
 - Conflits possibles de port local (ex: `8080` pris par Apache/IIS/WSL)
 - Configuration reseau mobile physique dependante de `EXPO_PUBLIC_API_URL`
-- Absence de couche repository (SQL encore en services)
 - Couverture tests forte backend, faible mobile
 
 ## 8. Prochaine Priorite
-Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox) et stabilisation UX chat (loading/error/retry), puis mise en place progressive d'une couche repository backend.
+Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox) et stabilisation UX chat (loading/error/retry).
 
 ## 9. Risques Techniques
 - Regression fonctionnelle lors du futur decoupage backend
@@ -111,6 +110,7 @@ Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox) et stabil
 - Port host API dedie (`18080`) pour eviter conflits locaux
 - Modularisation backend par domaines (`auth`, `social`, `chat`) via handlers/services
 - Standardisation projet: utilisation de `.env` uniquement (suppression `.env.example`)
+- Couche repositories Postgres dediee (`internal/repositories`) pour sortir le SQL des services
 
 ## 11. Date de Derniere Mise a Jour
-2026-03-02
+2026-03-03

@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"example.com/api/internal/auth"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"example.com/api/internal/repositories"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -26,13 +24,13 @@ type User struct {
 }
 
 type AuthService struct {
-	dbPool    *pgxpool.Pool
+	repo      repositories.AuthRepository
 	jwtSecret []byte
 }
 
-func NewAuthService(dbPool *pgxpool.Pool, jwtSecret []byte) *AuthService {
+func NewAuthService(repo repositories.AuthRepository, jwtSecret []byte) *AuthService {
 	return &AuthService{
-		dbPool:    dbPool,
+		repo:      repo,
 		jwtSecret: jwtSecret,
 	}
 }
@@ -44,18 +42,14 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (str
 		return "", User{}, err
 	}
 
-	var user User
-	err = s.dbPool.QueryRow(ctx, `
-		INSERT INTO users (email, password_hash)
-		VALUES ($1, $2)
-		RETURNING id, email, created_at
-	`, normalizedEmail, string(hash)).Scan(&user.ID, &user.Email, &user.CreatedAt)
+	created, err := s.repo.CreateUser(ctx, normalizedEmail, string(hash))
 	if err != nil {
-		if isUniqueViolation(err) {
+		if errors.Is(err, repositories.ErrAuthEmailExists) {
 			return "", User{}, ErrEmailExists
 		}
 		return "", User{}, err
 	}
+	user := User{ID: created.ID, Email: created.Email, CreatedAt: created.CreatedAt}
 
 	token, err := auth.SignUserToken(s.jwtSecret, user.ID)
 	if err != nil {
@@ -68,22 +62,21 @@ func (s *AuthService) Register(ctx context.Context, email, password string) (str
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, User, error) {
 	normalizedEmail := strings.ToLower(strings.TrimSpace(email))
 
-	var user User
-	var passwordHash string
-	err := s.dbPool.QueryRow(ctx, `
-		SELECT id, email, password_hash, created_at
-		FROM users
-		WHERE email = $1
-	`, normalizedEmail).Scan(&user.ID, &user.Email, &passwordHash, &user.CreatedAt)
+	stored, err := s.repo.GetUserAuthByEmail(ctx, normalizedEmail)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, repositories.ErrAuthNotFound) {
 			return "", User{}, ErrInvalidCredentials
 		}
 		return "", User{}, err
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(stored.PasswordHash), []byte(password)); err != nil {
 		return "", User{}, ErrInvalidCredentials
+	}
+	user := User{
+		ID:        stored.User.ID,
+		Email:     stored.User.Email,
+		CreatedAt: stored.User.CreatedAt,
 	}
 
 	token, err := auth.SignUserToken(s.jwtSecret, user.ID)
@@ -95,25 +88,12 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 }
 
 func (s *AuthService) Me(ctx context.Context, userID string) (User, error) {
-	var user User
-	err := s.dbPool.QueryRow(ctx, `
-		SELECT id, email, created_at
-		FROM users
-		WHERE id = $1
-	`, userID).Scan(&user.ID, &user.Email, &user.CreatedAt)
+	stored, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, repositories.ErrAuthNotFound) {
 			return User{}, ErrUserNotFound
 		}
 		return User{}, err
 	}
-	return user, nil
-}
-
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
-	}
-	return false
+	return User{ID: stored.ID, Email: stored.Email, CreatedAt: stored.CreatedAt}, nil
 }

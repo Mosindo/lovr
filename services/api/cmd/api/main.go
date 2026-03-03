@@ -10,6 +10,7 @@ import (
 	authmw "example.com/api/internal/auth"
 	"example.com/api/internal/db"
 	"example.com/api/internal/handlers"
+	"example.com/api/internal/repositories"
 	"example.com/api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -77,11 +78,14 @@ func main() {
 
 func setupRouter(a *app) *gin.Engine {
 	r := gin.Default()
-	authService := services.NewAuthService(a.dbPool, a.jwtSecret)
+	authRepo := repositories.NewPGAuthRepository(a.dbPool)
+	authService := services.NewAuthService(authRepo, a.jwtSecret)
 	authHandler := handlers.NewAuthHandler(authService)
-	socialService := services.NewSocialService(a.dbPool)
+	socialRepo := repositories.NewPGSocialRepository(a.dbPool)
+	socialService := services.NewSocialService(socialRepo)
 	socialHandler := handlers.NewSocialHandler(socialService)
-	chatService := services.NewChatService(a.dbPool)
+	chatRepo := repositories.NewPGChatRepository(a.dbPool)
+	chatService := services.NewChatService(chatRepo)
 	chatHandler := handlers.NewChatHandler(chatService)
 	requireUser := authmw.RequireUser(a.jwtSecret)
 
