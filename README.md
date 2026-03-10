@@ -130,7 +130,7 @@ Configuration GitHub requise:
 
 Duree attendue:
 - Typique: `5-12 minutes`
-- Au-dela de `15 minutes`: verifier les logs (etapes `npm ci`, `docker compose up --build`, `Wait API health`)
+- Au-dela de `15 minutes`: verifier les logs (etapes `npm ci`, `Start API`, `Wait API health`)
 - Verification branche protegee: tester via une PR vers `main`.
 
 Setup e2e UI device (fixtures match pre-creees):
