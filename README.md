@@ -115,6 +115,23 @@ Ce pipeline execute:
 Rapport genere:
 - `.smoke/qa-lite-report.txt`
 
+## CI QA Lite (GitHub Actions)
+Workflow:
+- `.github/workflows/qa-lite.yml`
+
+Declencheurs:
+- `push` sur `main`
+- `pull_request` vers `main`
+
+Configuration GitHub requise:
+- Aucune variable/secrets obligatoire pour ce workflow.
+- Verifier que GitHub Actions est active sur le repository.
+- Si votre branche par defaut n'est pas `main`, adapter `qa-lite.yml`.
+
+Duree attendue:
+- Typique: `5-12 minutes`
+- Au-dela de `15 minutes`: verifier les logs (etapes `npm ci`, `docker compose up --build`, `Wait API health`)
+
 Setup e2e UI device (fixtures match pre-creees):
 
 ```bash
