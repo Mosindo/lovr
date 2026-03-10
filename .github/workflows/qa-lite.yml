@@ -11,6 +11,22 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JWT_SECRET: ci-dev-only-change-this
+      DATABASE_URL: postgresql://app:app@localhost:5432/app?sslmode=disable
+      PORT: "18080"
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+          POSTGRES_DB: app
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app -d app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     steps:
       - name: Checkout
@@ -33,20 +49,23 @@ jobs:
         working-directory: apps/mobile
         run: npm ci
 
-      - name: Start API + DB
-        run: docker compose -f infra/docker-compose.yml up --build -d
+      - name: Start API
+        shell: bash
+        run: |
+          nohup go run ./services/api/cmd/api >/tmp/lovr-api.log 2>&1 &
+          echo $! >/tmp/lovr-api.pid
 
       - name: Wait API health
         shell: bash
         run: |
-          for i in {1..30}; do
+          for i in {1..60}; do
             if curl -fsS http://localhost:18080/health >/dev/null; then
               exit 0
             fi
-            sleep 2
+            sleep 1
           done
           echo "API healthcheck timeout"
-          docker compose -f infra/docker-compose.yml logs api postgres || true
+          tail -n 200 /tmp/lovr-api.log || true
           exit 1
 
       - name: Run QA lite
@@ -58,12 +77,20 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: qa-lite-reports
-          path: .smoke/*.txt
+          path: |
+            .smoke/qa-lite-report.txt
+            .smoke/report.txt
+          if-no-files-found: warn
 
-      - name: Compose logs on failure
+      - name: API logs on failure
         if: failure()
-        run: docker compose -f infra/docker-compose.yml logs api postgres
+        shell: bash
+        run: tail -n 200 /tmp/lovr-api.log || true
 
-      - name: Shutdown stack
+      - name: Shutdown API
         if: always()
-        run: docker compose -f infra/docker-compose.yml down -v
+        shell: bash
+        run: |
+          if [ -f /tmp/lovr-api.pid ]; then
+            kill "$(cat /tmp/lovr-api.pid)" || true
+          fi
