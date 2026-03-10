@@ -48,6 +48,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [backgroundError, setBackgroundError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const chatsInFlight = useRef(false);
   const messagesInFlight = useRef(false);
@@ -64,6 +65,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
     try {
       const nextChats = await chats(token);
       setChatList(nextChats);
+      setBackgroundError(null);
       setSelectedChat((current) => {
         if (!current) {
           return null;
@@ -71,8 +73,11 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
         return nextChats.find((chat) => chat.user.id === current.user.id) ?? null;
       });
     } catch (loadError) {
-      if (!silent) {
-        setError(formatChatError(loadError, "could not load chats"));
+      const formattedError = formatChatError(loadError, "could not load chats");
+      if (silent) {
+        setBackgroundError(formattedError);
+      } else {
+        setError(formattedError);
       }
     } finally {
       if (!silent) {
@@ -95,10 +100,14 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
       try {
         const nextMessages = await chatMessages(token, chat.user.id);
         setMessages(nextMessages);
+        setBackgroundError(null);
         return true;
       } catch (loadError) {
-        if (!silent) {
-          setError(formatChatError(loadError, "could not load messages"));
+        const formattedError = formatChatError(loadError, "could not load messages");
+        if (silent) {
+          setBackgroundError(formattedError);
+        } else {
+          setError(formattedError);
         }
         return false;
       } finally {
@@ -117,11 +126,11 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
 
   async function openChat(chat: ChatSummary) {
     setSelectedChat(chat);
+    setError(null);
+    setBackgroundError(null);
     const ok = await loadMessages(chat);
     if (!ok) {
-      setSelectedChat(null);
       setMessages([]);
-      await loadChats();
     }
   }
 
@@ -136,16 +145,27 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
 
     setSending(true);
     setError(null);
+    setBackgroundError(null);
     try {
       const sent = await sendChatMessage(token, selectedChat.user.id, content);
       setMessages((prev) => [...prev, sent]);
       setDraft("");
       await loadChats(true);
+      await loadMessages(selectedChat, true);
     } catch (sendError) {
       setError(formatChatError(sendError, "could not send message"));
     } finally {
       setSending(false);
     }
+  }
+
+  async function reloadCurrentView() {
+    setBackgroundError(null);
+    if (selectedChat) {
+      await loadMessages(selectedChat);
+      return;
+    }
+    await loadChats();
   }
 
   useEffect(() => {
@@ -188,6 +208,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
               setSelectedChat(null);
               setMessages([]);
               setError(null);
+              setBackgroundError(null);
             }}
             testID="chats-back-button"
           >
@@ -201,13 +222,7 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
 
         <Pressable
           disabled={loading || sending}
-          onPress={async () => {
-            if (selectedChat) {
-              await loadMessages(selectedChat);
-            } else {
-              await loadChats();
-            }
-          }}
+          onPress={reloadCurrentView}
           testID="chats-reload-button"
         >
           <Text style={[styles.reload, loading || sending ? styles.reloadDisabled : null]}>Reload</Text>
@@ -219,15 +234,17 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
           <Text style={styles.error}>{error}</Text>
           <Pressable
             disabled={loading || sending}
-            onPress={async () => {
-              if (selectedChat) {
-                await loadMessages(selectedChat);
-              } else {
-                await loadChats();
-              }
-            }}
+            onPress={reloadCurrentView}
           >
             <Text style={[styles.retry, loading || sending ? styles.retryDisabled : null]}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      {!error && backgroundError ? (
+        <View style={styles.warnWrap}>
+          <Text style={styles.warn}>{backgroundError}</Text>
+          <Pressable disabled={loading || sending} onPress={reloadCurrentView}>
+            <Text style={[styles.retry, loading || sending ? styles.retryDisabled : null]}>Reload</Text>
           </Pressable>
         </View>
       ) : null}
@@ -262,7 +279,12 @@ export default function ChatsScreen({ token, currentUserId }: ChatsScreenProps) 
               testID="chats-message-input"
               value={draft}
             />
-            <Pressable disabled={sending} onPress={onSend} style={styles.sendButton} testID="chats-send-button">
+            <Pressable
+              disabled={sending || loading}
+              onPress={onSend}
+              style={[styles.sendButton, sending || loading ? styles.sendButtonDisabled : null]}
+              testID="chats-send-button"
+            >
               <Text style={styles.sendText}>{sending ? "..." : "Send"}</Text>
             </Pressable>
           </View>
@@ -361,6 +383,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between"
   },
+  warnWrap: {
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between"
+  },
+  warn: {
+    color: "#92400e"
+  },
   retry: {
     color: "#2563eb",
     fontWeight: "700"
@@ -423,6 +454,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     alignItems: "center",
     justifyContent: "center"
+  },
+  sendButtonDisabled: {
+    opacity: 0.75
   },
   sendText: {
     color: "#ffffff",

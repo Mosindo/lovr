@@ -41,24 +41,27 @@ func NewAuthHandler(authService *services.AuthService) *AuthHandler {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req registerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logHandlerError(c, "auth.register.bind", err)
+		logHandlerError(c, "auth.register.bind", http.StatusBadRequest, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	token, user, err := h.authService.Register(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		logHandlerError(c, "auth.register", err)
+		status := http.StatusInternalServerError
 		switch {
 		case errors.Is(err, services.ErrEmailExists):
-			c.JSON(http.StatusConflict, gin.H{"error": "email already exists"})
+			status = http.StatusConflict
+			c.JSON(status, gin.H{"error": "email already exists"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create user"})
+			c.JSON(status, gin.H{"error": "could not create user"})
 		}
+		logHandlerError(c, "auth.register", status, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, authResponse{
+	status := http.StatusCreated
+	c.JSON(status, authResponse{
 		Token: token,
 		User: meResponse{
 			ID:        user.ID,
@@ -66,30 +69,33 @@ func (h *AuthHandler) Register(c *gin.Context) {
 			CreatedAt: user.CreatedAt,
 		},
 	})
-	logHandlerEvent(c, "auth.register.success", map[string]string{"created_user_id": user.ID})
+	logHandlerEvent(c, "auth.register.success", status, map[string]string{"created_user_id": user.ID})
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logHandlerError(c, "auth.login.bind", err)
+		logHandlerError(c, "auth.login.bind", http.StatusBadRequest, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	token, user, err := h.authService.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		logHandlerError(c, "auth.login", err)
+		status := http.StatusInternalServerError
 		switch {
 		case errors.Is(err, services.ErrInvalidCredentials):
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+			status = http.StatusUnauthorized
+			c.JSON(status, gin.H{"error": "invalid credentials"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not login"})
+			c.JSON(status, gin.H{"error": "could not login"})
 		}
+		logHandlerError(c, "auth.login", status, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, authResponse{
+	status := http.StatusOK
+	c.JSON(status, authResponse{
 		Token: token,
 		User: meResponse{
 			ID:        user.ID,
@@ -97,20 +103,22 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			CreatedAt: user.CreatedAt,
 		},
 	})
-	logHandlerEvent(c, "auth.login.success", map[string]string{"authenticated_user_id": user.ID})
+	logHandlerEvent(c, "auth.login.success", status, map[string]string{"authenticated_user_id": user.ID})
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
 	userID := c.GetString("userID")
 	user, err := h.authService.Me(c.Request.Context(), userID)
 	if err != nil {
-		logHandlerError(c, "auth.me", err)
+		status := http.StatusInternalServerError
 		switch {
 		case errors.Is(err, services.ErrUserNotFound):
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			status = http.StatusUnauthorized
+			c.JSON(status, gin.H{"error": "user not found"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch user"})
+			c.JSON(status, gin.H{"error": "could not fetch user"})
 		}
+		logHandlerError(c, "auth.me", status, err)
 		return
 	}
 

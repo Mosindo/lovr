@@ -15,10 +15,10 @@ Lovr est une application de rencontre "human-first" orientee confiance et securi
 | Domaine | Avancement | Notes |
 |---|---:|---|
 | Produit MVP (core flows) | 70% | Flows essentiels disponibles, hardening restant |
-| Backend API | 90% | Flows MVP presents + modularisation Auth/Social/Chat + couche repositories |
+| Backend API | 92% | Flows MVP presents + modularisation Auth/Social/Chat + couche repositories + logs structures renforces |
 | Base de donnees & migrations | 72% | Schema MVP en place, modeles futurs a consolider |
-| Mobile App | 74% | Auth + discover + matches + block + chat UI + polling conversation/listing |
-| Tests & qualite | 85% | Tests integration API + services + smoke e2e mobile + base e2e UI Maestro |
+| Mobile App | 76% | Auth + discover + matches + block + chat UI + polling conversation/listing + retry/error states chat renforces |
+| Tests & qualite | 86% | Tests integration API + services + smoke e2e mobile + base e2e UI Maestro |
 | DevOps / exploitation locale | 70% | Docker local stable, checklist runbook a renforcer |
 
 ### Smoke tests MVP (checklist courte)
@@ -97,10 +97,12 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 - Configuration reseau mobile physique dependante de `EXPO_PUBLIC_API_URL`
 - Couverture tests forte backend, faible mobile
 - Instabilite d'execution e2e UI locale (Maestro/adb/HOME/permissions/sessions longues)
+- Outillage e2e UI device dependant de prerequis externes (PATH, Java, CLI) selon environnement local
 
 ## 8. Prochaine Priorite
-- Stabilisation UX chat (loading/error/retry)
-- Observabilite backend minimale (logs structures)
+- Validation UX mobile multi-device (Android/iOS)
+- Execution CI/device des tests UI/e2e (Detox/Maestro)
+- Maintien d'une gate `QA lite` stable sans outillage device pour limiter les blocages de delivery
 
 ### Phase 1 – Bonus (Hardening technique)
 - Execution reelle des tests e2e UI sur device/emulateur (Maestro/Detox)
@@ -127,4 +129,4 @@ Etat: migrations MVP appliquees et coherentes avec les endpoints actuels.
 - Gate qualite MVP: prioriser smoke API/mobile automatises; UI e2e device en hardening technique
 
 ## 11. Date de Derniere Mise a Jour
-2026-03-03
+2026-03-10

@@ -30,7 +30,7 @@ function Run-Step([string]$name, [scriptblock]$action) {
 Push-Location $repoRoot
 try {
   Run-Step "Smoke API automatise (checklist MVP courte)" {
-    & powershell -ExecutionPolicy Bypass -File ".\scripts\smoke-api.ps1" -ApiBaseUrl $ApiBaseUrl
+    & (Join-Path $repoRoot "scripts/smoke-api.ps1") -ApiBaseUrl $ApiBaseUrl
     if ($LASTEXITCODE -ne 0) { throw "smoke-api exited with code $LASTEXITCODE" }
   }
 

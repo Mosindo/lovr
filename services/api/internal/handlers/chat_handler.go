@@ -52,7 +52,7 @@ func (h *ChatHandler) Chats(c *gin.Context) {
 	userID := c.GetString("userID")
 	chats, err := h.chatService.ListChats(c.Request.Context(), userID)
 	if err != nil {
-		logHandlerError(c, "chat.list", err)
+		logHandlerError(c, "chat.list", http.StatusInternalServerError, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch chats"})
 		return
 	}
@@ -82,12 +82,12 @@ func (h *ChatHandler) ChatMessages(c *gin.Context) {
 	userID := c.GetString("userID")
 	otherUserID := strings.TrimSpace(c.Param("userId"))
 	if !isUUIDLike(otherUserID) {
-		logHandlerError(c, "chat.messages.validate_user_id", errors.New("invalid user id"))
+		logHandlerError(c, "chat.messages.validate_user_id", http.StatusBadRequest, errors.New("invalid user id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 	if otherUserID == userID {
-		logHandlerError(c, "chat.messages.validate_self", errors.New("cannot open self chat"))
+		logHandlerError(c, "chat.messages.validate_self", http.StatusBadRequest, errors.New("cannot open self chat"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot open self chat"})
 		return
 	}
@@ -95,21 +95,25 @@ func (h *ChatHandler) ChatMessages(c *gin.Context) {
 	limit := parsePositiveInt(c.Query("limit"), 200)
 	messages, err := h.chatService.ListMessagesWithLimit(c.Request.Context(), userID, otherUserID, limit)
 	if err != nil {
-		logHandlerError(c, "chat.messages", err)
+		status := http.StatusInternalServerError
 		switch {
 		case errors.Is(err, services.ErrValidateChatTarget):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not validate chat target"})
+			c.JSON(status, gin.H{"error": "could not validate chat target"})
 		case errors.Is(err, services.ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			status = http.StatusNotFound
+			c.JSON(status, gin.H{"error": "user not found"})
 		case errors.Is(err, services.ErrValidateChatAccess):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not validate chat access"})
+			c.JSON(status, gin.H{"error": "could not validate chat access"})
 		case errors.Is(err, services.ErrInteractionBlock):
-			c.JSON(http.StatusForbidden, gin.H{"error": "interaction blocked"})
+			status = http.StatusForbidden
+			c.JSON(status, gin.H{"error": "interaction blocked"})
 		case errors.Is(err, services.ErrChatRequiresMatch):
-			c.JSON(http.StatusForbidden, gin.H{"error": "chat allowed only after match"})
+			status = http.StatusForbidden
+			c.JSON(status, gin.H{"error": "chat allowed only after match"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch messages"})
+			c.JSON(status, gin.H{"error": "could not fetch messages"})
 		}
+		logHandlerError(c, "chat.messages", status, err)
 		return
 	}
 
@@ -131,53 +135,59 @@ func (h *ChatHandler) SendChatMessage(c *gin.Context) {
 	userID := c.GetString("userID")
 	otherUserID := strings.TrimSpace(c.Param("userId"))
 	if !isUUIDLike(otherUserID) {
-		logHandlerError(c, "chat.send.validate_user_id", errors.New("invalid user id"))
+		logHandlerError(c, "chat.send.validate_user_id", http.StatusBadRequest, errors.New("invalid user id"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
 		return
 	}
 	if otherUserID == userID {
-		logHandlerError(c, "chat.send.validate_self", errors.New("cannot message yourself"))
+		logHandlerError(c, "chat.send.validate_self", http.StatusBadRequest, errors.New("cannot message yourself"))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot message yourself"})
 		return
 	}
 
 	var req sendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logHandlerError(c, "chat.send.bind", err)
+		logHandlerError(c, "chat.send.bind", http.StatusBadRequest, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	message, err := h.chatService.SendMessage(c.Request.Context(), userID, otherUserID, req.Content)
 	if err != nil {
-		logHandlerError(c, "chat.send", err)
+		status := http.StatusInternalServerError
 		switch {
 		case errors.Is(err, services.ErrValidateChatTarget):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not validate chat target"})
+			c.JSON(status, gin.H{"error": "could not validate chat target"})
 		case errors.Is(err, services.ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			status = http.StatusNotFound
+			c.JSON(status, gin.H{"error": "user not found"})
 		case errors.Is(err, services.ErrValidateChatAccess):
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not validate chat access"})
+			c.JSON(status, gin.H{"error": "could not validate chat access"})
 		case errors.Is(err, services.ErrInteractionBlock):
-			c.JSON(http.StatusForbidden, gin.H{"error": "interaction blocked"})
+			status = http.StatusForbidden
+			c.JSON(status, gin.H{"error": "interaction blocked"})
 		case errors.Is(err, services.ErrChatRequiresMatch):
-			c.JSON(http.StatusForbidden, gin.H{"error": "chat allowed only after match"})
+			status = http.StatusForbidden
+			c.JSON(status, gin.H{"error": "chat allowed only after match"})
 		case errors.Is(err, services.ErrMessageContentNeeded):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "message content required"})
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "message content required"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not send message"})
+			c.JSON(status, gin.H{"error": "could not send message"})
 		}
+		logHandlerError(c, "chat.send", status, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, chatMessageResponse{
+	status := http.StatusCreated
+	c.JSON(status, chatMessageResponse{
 		ID:              message.ID,
 		SenderUserID:    message.SenderUserID,
 		RecipientUserID: message.RecipientUserID,
 		Content:         message.Content,
 		CreatedAt:       message.CreatedAt,
 	})
-	logHandlerEvent(c, "chat.send.success", map[string]string{
+	logHandlerEvent(c, "chat.send.success", status, map[string]string{
 		"recipient_user_id": otherUserID,
 		"message_id":        message.ID,
 	})

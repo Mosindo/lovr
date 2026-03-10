@@ -99,6 +99,22 @@ npm run e2e:smoke
 Variable optionnelle:
 - `MOBILE_E2E_API_URL` (sinon fallback `EXPO_PUBLIC_API_URL`, puis `http://localhost:18080`)
 
+QA lite (sans Maestro/adb):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\qa-lite.ps1 -ApiBaseUrl http://localhost:18080
+```
+
+Ce pipeline execute:
+- `gofmt` backend
+- `go test ./...`
+- `go build ./cmd/api`
+- `npx tsc --noEmit` mobile
+- `smoke-all` (API + mobile critique)
+
+Rapport genere:
+- `.smoke/qa-lite-report.txt`
+
 Setup e2e UI device (fixtures match pre-creees):
 
 ```bash

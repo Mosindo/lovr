@@ -105,6 +105,7 @@ func setupRouter(a *app) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(requestIDMiddleware())
+	r.Use(requestStartMiddleware())
 	r.Use(requestMetricsMiddleware())
 	r.Use(requestLogger())
 	authRepo := repositories.NewPGAuthRepository(a.dbPool)
@@ -178,24 +179,44 @@ func requestMetricsMiddleware() gin.HandlerFunc {
 
 func requestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		start := time.Now()
 		c.Next()
 
 		path := c.FullPath()
 		if path == "" {
 			path = c.Request.URL.Path
 		}
+		userID := c.GetString("userID")
 
 		log.Printf(
-			`{"event":"http_request","request_id":%q,"method":%q,"path":%q,"status":%d,"latency_ms":%d,"client_ip":%q}`,
+			`{"event":"http_request","request_id":%q,"method":%q,"path":%q,"status":%d,"latency_ms":%d,"client_ip":%q,"user_id":%q}`,
 			c.GetString("request_id"),
 			c.Request.Method,
 			path,
 			c.Writer.Status(),
-			time.Since(start).Milliseconds(),
+			requestLatencyFromContext(c),
 			c.ClientIP(),
+			userID,
 		)
 	}
+}
+
+func requestStartMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Set("request_started_at", time.Now())
+		c.Next()
+	}
+}
+
+func requestLatencyFromContext(c *gin.Context) int64 {
+	startedAt, ok := c.Get("request_started_at")
+	if !ok {
+		return 0
+	}
+	start, ok := startedAt.(time.Time)
+	if !ok {
+		return 0
+	}
+	return time.Since(start).Milliseconds()
 }
 
 func requestIDMiddleware() gin.HandlerFunc {

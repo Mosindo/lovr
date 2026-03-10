@@ -1,5 +1,43 @@
 # Lovr - Daily Log
 
+## 2026-03-10
+
+### Fait Aujourd'hui
+- Reprise projet sur les priorites `PROJECT_STATUS.md` sans ajout de nouvelle feature.
+- Stabilisation UX chat mobile sur `apps/mobile/src/screens/ChatsScreen.tsx`:
+  - gestion des erreurs de rafraichissement silencieux (`backgroundError`) au lieu de masquer les echecs polling;
+  - action `Reload/Retry` contextualisee via une seule routine de relance;
+  - ouverture de conversation rendue plus robuste (on conserve le contexte de chat, sans retour force a la liste en cas d'echec de load);
+  - desactivation du bouton `Send` pendant `loading`/`sending` pour eviter les actions concurrentes.
+- Observabilite backend minimale renforcee:
+  - `request_start` middleware ajoute dans `services/api/cmd/api/main.go`;
+  - log HTTP structure enrichi avec `user_id` et latence calculee depuis le contexte requete;
+  - logs handlers (`Auth/Social/Chat`) homogenises avec `status` et `latency_ms`;
+  - logs evenementiels handlers (`register/login/like/block/send`) enrichis avec `status` et `latency_ms`.
+- Documentation statut projet mise a jour (`PROJECT_STATUS.md`).
+- Alternative simple a Maestro ajoutee: script `scripts/qa-lite.ps1` (gate complete backend + mobile sans outillage device).
+- Documentation README alignee sur le flux `QA lite`.
+- CI ajoutee: workflow GitHub Actions `.github/workflows/qa-lite.yml` (Docker stack + healthcheck + `qa-lite` + artefacts rapports).
+
+### Problemes Rencontres
+- `go test ./...` et `go build ./cmd/api` ont depasse le timeout par defaut de l'outil, puis ont ete relances avec timeout etendus (resultat OK).
+
+### Decisions Prises
+- Prioriser uniquement les corrections de stabilisation/observabilite deja listees comme prioritaires.
+- Ne pas introduire de nouvelle dependance ni de refactor structurel hors besoin direct.
+- En cas de blocage outillage e2e UI device, utiliser `QA lite` comme gate de livraison continue.
+
+### Impact Estime Sur L'avancement
+- +2% Backend API (logs structures plus actionnables en exploitation).
+- +2% Mobile App (gestion retry/error chat plus robuste sur reseau instable).
+- +1% Tests & qualite (revalidation complete backend + smoke API execute).
+
+### Prochaine Action
+- Validation UX mobile multi-device (Android/iOS) avec run complet device reel.
+- Execution/fiabilisation CI des tests UI/e2e (Maestro puis trajectoire Detox).
+
+---
+
 ## 2026-03-02
 
 ### Fait Aujourd'hui

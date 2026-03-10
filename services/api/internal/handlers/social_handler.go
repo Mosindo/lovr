@@ -54,7 +54,7 @@ func (h *SocialHandler) Discover(c *gin.Context) {
 	limit := parsePositiveInt(c.Query("limit"), 50)
 	users, err := h.socialService.DiscoverWithLimit(c.Request.Context(), userID, limit)
 	if err != nil {
-		logHandlerError(c, "social.discover", err)
+		logHandlerError(c, "social.discover", http.StatusInternalServerError, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch discover users"})
 		return
 	}
@@ -76,29 +76,34 @@ func (h *SocialHandler) Like(c *gin.Context) {
 
 	var req likeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logHandlerError(c, "social.like.bind", err)
+		logHandlerError(c, "social.like.bind", http.StatusBadRequest, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	matched, err := h.socialService.Like(c.Request.Context(), userID, strings.TrimSpace(req.ToUserID))
 	if err != nil {
-		logHandlerError(c, "social.like", err)
+		status := http.StatusInternalServerError
 		switch {
 		case errors.Is(err, services.ErrCannotLikeSelf):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot like yourself"})
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "cannot like yourself"})
 		case errors.Is(err, services.ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			status = http.StatusNotFound
+			c.JSON(status, gin.H{"error": "user not found"})
 		case errors.Is(err, services.ErrInteractionBlock):
-			c.JSON(http.StatusForbidden, gin.H{"error": "interaction blocked"})
+			status = http.StatusForbidden
+			c.JSON(status, gin.H{"error": "interaction blocked"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not save like"})
+			c.JSON(status, gin.H{"error": "could not save like"})
 		}
+		logHandlerError(c, "social.like", status, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, likeResponse{Matched: matched})
-	logHandlerEvent(c, "social.like.success", map[string]string{
+	status := http.StatusOK
+	c.JSON(status, likeResponse{Matched: matched})
+	logHandlerEvent(c, "social.like.success", status, map[string]string{
 		"to_user_id": req.ToUserID,
 		"matched":    strconv.FormatBool(matched),
 	})
@@ -109,27 +114,31 @@ func (h *SocialHandler) Block(c *gin.Context) {
 
 	var req blockRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logHandlerError(c, "social.block.bind", err)
+		logHandlerError(c, "social.block.bind", http.StatusBadRequest, err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
 	err := h.socialService.Block(c.Request.Context(), userID, strings.TrimSpace(req.ToUserID))
 	if err != nil {
-		logHandlerError(c, "social.block", err)
+		status := http.StatusInternalServerError
 		switch {
 		case errors.Is(err, services.ErrCannotBlockSelf):
-			c.JSON(http.StatusBadRequest, gin.H{"error": "cannot block yourself"})
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "cannot block yourself"})
 		case errors.Is(err, services.ErrUserNotFound):
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			status = http.StatusNotFound
+			c.JSON(status, gin.H{"error": "user not found"})
 		default:
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not block user"})
+			c.JSON(status, gin.H{"error": "could not block user"})
 		}
+		logHandlerError(c, "social.block", status, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, blockResponse{Blocked: true})
-	logHandlerEvent(c, "social.block.success", map[string]string{
+	status := http.StatusOK
+	c.JSON(status, blockResponse{Blocked: true})
+	logHandlerEvent(c, "social.block.success", status, map[string]string{
 		"blocked_user_id": req.ToUserID,
 	})
 }
@@ -138,7 +147,7 @@ func (h *SocialHandler) Matches(c *gin.Context) {
 	userID := c.GetString("userID")
 	matches, err := h.socialService.Matches(c.Request.Context(), userID)
 	if err != nil {
-		logHandlerError(c, "social.matches", err)
+		logHandlerError(c, "social.matches", http.StatusInternalServerError, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch matches"})
 		return
 	}
