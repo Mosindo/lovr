@@ -52,8 +52,8 @@ jobs:
       - name: Start API
         shell: bash
         run: |
-          nohup go run ./services/api/cmd/api >/tmp/lovr-api.log 2>&1 &
-          echo $! >/tmp/lovr-api.pid
+          nohup go run ./services/api/cmd/api >/tmp/boilerplate-api.log 2>&1 &
+          echo $! >/tmp/boilerplate-api.pid
 
       - name: Wait API health
         shell: bash
@@ -65,7 +65,7 @@ jobs:
             sleep 1
           done
           echo "API healthcheck timeout"
-          tail -n 200 /tmp/lovr-api.log || true
+          tail -n 200 /tmp/boilerplate-api.log || true
           exit 1
 
       - name: Run QA lite
@@ -85,12 +85,12 @@ jobs:
       - name: API logs on failure
         if: failure()
         shell: bash
-        run: tail -n 200 /tmp/lovr-api.log || true
+        run: tail -n 200 /tmp/boilerplate-api.log || true
 
       - name: Shutdown API
         if: always()
         shell: bash
         run: |
-          if [ -f /tmp/lovr-api.pid ]; then
-            kill "$(cat /tmp/lovr-api.pid)" || true
+          if [ -f /tmp/boilerplate-api.pid ]; then
+            kill "$(cat /tmp/boilerplate-api.pid)" || true
           fi

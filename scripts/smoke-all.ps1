@@ -51,7 +51,7 @@ finally {
 
 $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $header = @(
-  "Lovr Smoke Report",
+  "Boilerplate Smoke Report",
   "Generated: $stamp",
   "API Base URL: $ApiBaseUrl",
   ""

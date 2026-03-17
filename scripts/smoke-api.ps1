@@ -10,7 +10,7 @@ $password = "Password123"
 function New-UniqueEmail([string]$prefix) {
   $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $rand = Get-Random -Maximum 100000
-  return "${prefix}_${stamp}_${rand}@lovr.test"
+  return "${prefix}_${stamp}_${rand}@boilerplate.test"
 }
 
 function Invoke-Api([string]$Method, [string]$Path, [object]$Body = $null, [hashtable]$Headers = @{}) {
@@ -40,21 +40,20 @@ try {
   }
 
   $headers1 = @{ Authorization = "Bearer $($auth1.token)" }
-  $headers2 = @{ Authorization = "Bearer $($auth2.token)" }
 
-  $discover1 = Invoke-Api "Get" "/discover" $null $headers1
-  if (-not ($discover1.users | Where-Object { $_.id -eq $auth2.user.id })) {
-    throw "discover should include second user before interactions"
+  $users = Invoke-Api "Get" "/users" $null $headers1
+  if (-not ($users.users | Where-Object { $_.id -eq $auth2.user.id })) {
+    throw "users list should include second user"
   }
 
-  $like12 = Invoke-Api "Post" "/likes" @{ toUserId = $auth2.user.id } $headers1
-  if ($like12.matched -ne $false) {
-    throw "first like should be unmatched"
+  $post = Invoke-Api "Post" "/posts" @{ title = "Smoke post"; body = "Validating the generic post feed." } $headers1
+  if ([string]::IsNullOrWhiteSpace($post.id)) {
+    throw "post create failed"
   }
 
-  $like21 = Invoke-Api "Post" "/likes" @{ toUserId = $auth1.user.id } $headers2
-  if ($like21.matched -ne $true) {
-    throw "second like should produce match"
+  $posts = Invoke-Api "Get" "/posts" $null $headers1
+  if (-not ($posts.posts | Where-Object { $_.id -eq $post.id })) {
+    throw "created post missing from list"
   }
 
   $msg = Invoke-Api "Post" "/chats/$($auth2.user.id)/messages" @{ content = "hello from smoke-api" } $headers1
@@ -67,26 +66,23 @@ try {
     throw "message list empty"
   }
 
-  $block = Invoke-Api "Post" "/block" @{ toUserId = $auth2.user.id } $headers1
-  if ($block.blocked -ne $true) {
-    throw "block failed"
+  $notification = Invoke-Api "Post" "/notifications" @{
+    type  = "system"
+    title = "Smoke notification"
+    body  = "Validating the generic notification flow."
+  } $headers1
+  if ([string]::IsNullOrWhiteSpace($notification.id)) {
+    throw "notification create failed"
   }
 
-  $likeAfterBlockStatus = 0
-  try {
-    Invoke-Api "Post" "/likes" @{ toUserId = $auth1.user.id } $headers2 | Out-Null
-    $likeAfterBlockStatus = 200
-  }
-  catch {
-    $likeAfterBlockStatus = $_.Exception.Response.StatusCode.value__
-  }
-  if ($likeAfterBlockStatus -ne 403) {
-    throw "like after block should return 403, got $likeAfterBlockStatus"
+  $notifications = Invoke-Api "Get" "/notifications" $null $headers1
+  if (-not ($notifications.notifications | Where-Object { $_.id -eq $notification.id })) {
+    throw "notification missing from list"
   }
 
-  $discoverAfter = Invoke-Api "Get" "/discover" $null $headers1
-  if ($discoverAfter.users | Where-Object { $_.id -eq $auth2.user.id }) {
-    throw "blocked user still visible in discover"
+  $readNotification = Invoke-Api "Post" "/notifications/$($notification.id)/read" $null $headers1
+  if ($readNotification.isRead -ne $true) {
+    throw "notification should be marked as read"
   }
 
   Write-Output "[smoke-api] PASS"

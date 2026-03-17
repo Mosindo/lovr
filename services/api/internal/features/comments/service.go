@@ -1,0 +1,93 @@
+package comments
+
+import (
+	"context"
+	"errors"
+	"strings"
+)
+
+var (
+	ErrPostNotFound         = errors.New("post not found")
+	ErrCommentContentNeeded = errors.New("comment content required")
+)
+
+type Service struct {
+	repo Repository
+}
+
+const (
+	defaultCommentsLimit = 20
+	maxCommentsLimit     = 200
+)
+
+func NewService(repo Repository) *Service {
+	return &Service{repo: repo}
+}
+
+func (s *Service) ListByPost(ctx context.Context, postID string, limit, offset int) ([]Comment, error) {
+	exists, err := s.repo.PostExists(ctx, postID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrPostNotFound
+	}
+
+	normalizedLimit := normalizeCommentsLimit(limit)
+	normalizedOffset := normalizeCommentsOffset(offset)
+	comments, err := s.repo.ListCommentsByPost(ctx, postID, normalizedLimit, normalizedOffset)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := make([]Comment, 0, len(comments))
+	for _, comment := range comments {
+		payload = append(payload, mapStoredComment(comment))
+	}
+	return payload, nil
+}
+
+func (s *Service) Create(ctx context.Context, postID, authorUserID, content string) (Comment, error) {
+	normalizedContent := strings.TrimSpace(content)
+	if normalizedContent == "" {
+		return Comment{}, ErrCommentContentNeeded
+	}
+
+	comment, err := s.repo.CreateComment(ctx, postID, authorUserID, normalizedContent)
+	if err != nil {
+		if errors.Is(err, ErrCommentPostNotFound) {
+			return Comment{}, ErrPostNotFound
+		}
+		return Comment{}, err
+	}
+
+	return mapStoredComment(comment), nil
+}
+
+func mapStoredComment(comment StoredComment) Comment {
+	return Comment{
+		ID:           comment.ID,
+		PostID:       comment.PostID,
+		AuthorUserID: comment.AuthorUserID,
+		Content:      comment.Content,
+		CreatedAt:    comment.CreatedAt,
+		UpdatedAt:    comment.UpdatedAt,
+	}
+}
+
+func normalizeCommentsLimit(limit int) int {
+	if limit <= 0 {
+		return defaultCommentsLimit
+	}
+	if limit > maxCommentsLimit {
+		return maxCommentsLimit
+	}
+	return limit
+}
+
+func normalizeCommentsOffset(offset int) int {
+	if offset < 0 {
+		return 0
+	}
+	return offset
+}
