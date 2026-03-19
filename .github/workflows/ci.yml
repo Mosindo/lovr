@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/api/go.mod
+
+      - name: Install Go dependencies
+        working-directory: services/api
+        run: go mod download
+
+      - name: Run Go tests
+        working-directory: services/api
+        run: go test ./...
+
+      - name: Build the backend
+        working-directory: services/api
+        run: go build ./cmd/api
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        working-directory: apps/mobile
+        run: npm install
+
+      - name: Verify TypeScript
+        working-directory: apps/mobile
+        run: npx tsc --noEmit
+
+      - name: Build Docker image
+        run: docker build services/api -t api-test
+

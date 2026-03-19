@@ -5,7 +5,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -99,9 +98,6 @@ func (r *PGRepository) PostExists(ctx context.Context, postID string) (bool, err
 		)
 	`, postID).Scan(&exists)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return false, nil
-		}
 		return false, err
 	}
 	return exists, nil
