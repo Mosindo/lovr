@@ -20,9 +20,15 @@ func NewHandler(service *Service) *Handler {
 
 func (h *Handler) Chats(c *gin.Context) {
 	userID := c.GetString("userID")
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "chat.list.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
 	limit := parseBoundedLimit(c.Query("limit"), 20, 100)
 	offset := parseNonNegativeInt(c.Query("offset"), 0)
-	chats, err := h.service.ListChatsWithPagination(c.Request.Context(), userID, limit, offset)
+	chats, err := h.service.ListChatsWithPagination(c.Request.Context(), organizationID, userID, limit, offset)
 	if err != nil {
 		logger.LogHandlerError(c, "chat.list", http.StatusInternalServerError, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch chats"})
@@ -52,6 +58,12 @@ func (h *Handler) Chats(c *gin.Context) {
 
 func (h *Handler) ChatMessages(c *gin.Context) {
 	userID := c.GetString("userID")
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "chat.messages.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
 	otherUserID := strings.TrimSpace(c.Param("userId"))
 	if !isUUIDLike(otherUserID) {
 		logger.LogHandlerError(c, "chat.messages.validate_user_id", http.StatusBadRequest, errors.New("invalid user id"))
@@ -65,7 +77,7 @@ func (h *Handler) ChatMessages(c *gin.Context) {
 	}
 
 	limit := parsePositiveInt(c.Query("limit"), 200)
-	messages, err := h.service.ListMessagesWithLimit(c.Request.Context(), userID, otherUserID, limit)
+	messages, err := h.service.ListMessagesWithLimit(c.Request.Context(), organizationID, userID, otherUserID, limit)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
@@ -97,6 +109,12 @@ func (h *Handler) ChatMessages(c *gin.Context) {
 
 func (h *Handler) SendChatMessage(c *gin.Context) {
 	userID := c.GetString("userID")
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "chat.send.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
 	otherUserID := strings.TrimSpace(c.Param("userId"))
 	if !isUUIDLike(otherUserID) {
 		logger.LogHandlerError(c, "chat.send.validate_user_id", http.StatusBadRequest, errors.New("invalid user id"))
@@ -116,7 +134,7 @@ func (h *Handler) SendChatMessage(c *gin.Context) {
 		return
 	}
 
-	message, err := h.service.SendMessage(c.Request.Context(), userID, otherUserID, req.Content)
+	message, err := h.service.SendMessage(c.Request.Context(), organizationID, userID, otherUserID, req.Content)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {

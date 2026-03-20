@@ -24,7 +24,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	token, user, err := h.service.Register(c.Request.Context(), req.Email, req.Password)
+	tokens, user, err := h.service.Register(c.Request.Context(), req.Email, req.Password, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
@@ -40,11 +40,14 @@ func (h *Handler) Register(c *gin.Context) {
 
 	status := http.StatusCreated
 	c.JSON(status, AuthResponse{
-		Token: token,
+		Token:        tokens.AccessToken,
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
 		User: MeResponse{
-			ID:        user.ID,
-			Email:     user.Email,
-			CreatedAt: user.CreatedAt,
+			ID:             user.ID,
+			Email:          user.Email,
+			OrganizationID: user.OrganizationID,
+			CreatedAt:      user.CreatedAt,
 		},
 	})
 	logger.LogHandlerEvent(c, "auth.register.success", status, map[string]string{"created_user_id": user.ID})
@@ -58,7 +61,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	token, user, err := h.service.Login(c.Request.Context(), req.Email, req.Password)
+	tokens, user, err := h.service.Login(c.Request.Context(), req.Email, req.Password, c.Request.UserAgent(), c.ClientIP())
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
@@ -74,14 +77,81 @@ func (h *Handler) Login(c *gin.Context) {
 
 	status := http.StatusOK
 	c.JSON(status, AuthResponse{
-		Token: token,
+		Token:        tokens.AccessToken,
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
 		User: MeResponse{
-			ID:        user.ID,
-			Email:     user.Email,
-			CreatedAt: user.CreatedAt,
+			ID:             user.ID,
+			Email:          user.Email,
+			OrganizationID: user.OrganizationID,
+			CreatedAt:      user.CreatedAt,
 		},
 	})
 	logger.LogHandlerEvent(c, "auth.login.success", status, map[string]string{"authenticated_user_id": user.ID})
+}
+
+func (h *Handler) Refresh(c *gin.Context) {
+	var req RefreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.LogHandlerError(c, "auth.refresh.bind", http.StatusBadRequest, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	tokens, user, err := h.service.Refresh(c.Request.Context(), req.RefreshToken, c.Request.UserAgent(), c.ClientIP())
+	if err != nil {
+		status := http.StatusInternalServerError
+		switch {
+		case errors.Is(err, ErrInvalidRefreshToken):
+			status = http.StatusUnauthorized
+			c.JSON(status, gin.H{"error": "invalid refresh token"})
+		case errors.Is(err, ErrUserNotFound):
+			status = http.StatusUnauthorized
+			c.JSON(status, gin.H{"error": "user not found"})
+		default:
+			c.JSON(status, gin.H{"error": "could not refresh session"})
+		}
+		logger.LogHandlerError(c, "auth.refresh", status, err)
+		return
+	}
+
+	status := http.StatusOK
+	c.JSON(status, AuthResponse{
+		Token:        tokens.AccessToken,
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		User: MeResponse{
+			ID:             user.ID,
+			Email:          user.Email,
+			OrganizationID: user.OrganizationID,
+			CreatedAt:      user.CreatedAt,
+		},
+	})
+	logger.LogHandlerEvent(c, "auth.refresh.success", status, map[string]string{"authenticated_user_id": user.ID})
+}
+
+func (h *Handler) Logout(c *gin.Context) {
+	var req LogoutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.LogHandlerError(c, "auth.logout.bind", http.StatusBadRequest, err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	if err := h.service.Logout(c.Request.Context(), req.RefreshToken); err != nil {
+		status := http.StatusInternalServerError
+		switch {
+		case errors.Is(err, ErrInvalidRefreshToken):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "invalid refresh token"})
+		default:
+			c.JSON(status, gin.H{"error": "could not logout"})
+		}
+		logger.LogHandlerError(c, "auth.logout", status, err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 func (h *Handler) Me(c *gin.Context) {
@@ -101,8 +171,9 @@ func (h *Handler) Me(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, MeResponse{
-		ID:        user.ID,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt,
+		ID:             user.ID,
+		Email:          user.Email,
+		OrganizationID: user.OrganizationID,
+		CreatedAt:      user.CreatedAt,
 	})
 }

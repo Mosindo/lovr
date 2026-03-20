@@ -22,20 +22,24 @@ type testResponse struct {
 }
 
 type userResponse struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID             string    `json:"id"`
+	Email          string    `json:"email"`
+	OrganizationID string    `json:"organizationId"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 type meResponse struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID             string    `json:"id"`
+	Email          string    `json:"email"`
+	OrganizationID string    `json:"organizationId"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 type authResponse struct {
-	Token string     `json:"token"`
-	User  meResponse `json:"user"`
+	Token        string     `json:"token"`
+	AccessToken  string     `json:"accessToken"`
+	RefreshToken string     `json:"refreshToken"`
+	User         meResponse `json:"user"`
 }
 
 type usersResponse struct {
@@ -202,6 +206,15 @@ func TestAuthAndUsersFlow(t *testing.T) {
 	if auth1.Token == "" || auth2.Token == "" {
 		t.Fatalf("expected non-empty JWT tokens")
 	}
+	if auth1.RefreshToken == "" || auth2.RefreshToken == "" {
+		t.Fatalf("expected non-empty refresh tokens")
+	}
+	if auth1.User.OrganizationID == "" || auth2.User.OrganizationID == "" {
+		t.Fatalf("expected organization ids on auth payloads")
+	}
+	if auth1.User.OrganizationID != auth2.User.OrganizationID {
+		t.Fatalf("expected both users in the default organization for current SaaS foundation")
+	}
 
 	meResp := doRequest(t, router, http.MethodGet, "/me", nil, auth1.Token)
 	if meResp.Status != http.StatusOK {
@@ -213,6 +226,9 @@ func TestAuthAndUsersFlow(t *testing.T) {
 	}
 	if meUser.Email != email1 {
 		t.Fatalf("expected /me email %s, got %s", email1, meUser.Email)
+	}
+	if meUser.OrganizationID != auth1.User.OrganizationID {
+		t.Fatalf("expected /me organization id %s, got %s", auth1.User.OrganizationID, meUser.OrganizationID)
 	}
 
 	usersList := doRequest(t, router, http.MethodGet, "/users", nil, auth1.Token)
@@ -237,6 +253,40 @@ func TestAuthAndUsersFlow(t *testing.T) {
 	}
 	if listedUser.Email != email2 {
 		t.Fatalf("expected /users/:id email %s, got %s", email2, listedUser.Email)
+	}
+	if listedUser.OrganizationID != auth1.User.OrganizationID {
+		t.Fatalf("expected /users/:id organization id %s, got %s", auth1.User.OrganizationID, listedUser.OrganizationID)
+	}
+
+	refresh := doRequest(t, router, http.MethodPost, "/auth/refresh", map[string]string{
+		"refreshToken": auth1.RefreshToken,
+	}, "")
+	if refresh.Status != http.StatusOK {
+		t.Fatalf("refresh expected 200, got %d body=%s", refresh.Status, string(refresh.Body))
+	}
+	var refreshed authResponse
+	if err := json.Unmarshal(refresh.Body, &refreshed); err != nil {
+		t.Fatalf("unmarshal refresh: %v", err)
+	}
+	if refreshed.Token == "" || refreshed.RefreshToken == "" {
+		t.Fatalf("expected non-empty refreshed tokens")
+	}
+	if refreshed.RefreshToken == auth1.RefreshToken {
+		t.Fatalf("expected rotated refresh token")
+	}
+
+	logout := doRequest(t, router, http.MethodPost, "/auth/logout", map[string]string{
+		"refreshToken": refreshed.RefreshToken,
+	}, "")
+	if logout.Status != http.StatusNoContent {
+		t.Fatalf("logout expected 204, got %d body=%s", logout.Status, string(logout.Body))
+	}
+
+	refreshAfterLogout := doRequest(t, router, http.MethodPost, "/auth/refresh", map[string]string{
+		"refreshToken": refreshed.RefreshToken,
+	}, "")
+	if refreshAfterLogout.Status != http.StatusUnauthorized {
+		t.Fatalf("refresh after logout expected 401, got %d body=%s", refreshAfterLogout.Status, string(refreshAfterLogout.Body))
 	}
 }
 
@@ -701,6 +751,114 @@ func TestPostsCommentsNotificationsAndFilesFlow(t *testing.T) {
 	}
 }
 
+func TestTenantIsolationAcrossUsersPostsAndChats(t *testing.T) {
+	router, pool := setupTestRouter(t)
+	defer pool.Close()
+
+	defaultEmail := uniqueEmail("tenant_default")
+	otherEmail := uniqueEmail("tenant_other")
+	password := "Password123"
+
+	otherOrgID := createOrganization(t, pool, "tenant-isolation", "Tenant Isolation Workspace")
+	defer cleanupOrganizations(t, pool, []string{otherOrgID})
+	defer cleanupUsers(t, pool, []string{defaultEmail, otherEmail})
+
+	registerDefault := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{
+		"email":    defaultEmail,
+		"password": password,
+	}, "")
+	registerOther := doRequest(t, router, http.MethodPost, "/auth/register", map[string]string{
+		"email":    otherEmail,
+		"password": password,
+	}, "")
+	if registerDefault.Status != http.StatusCreated || registerOther.Status != http.StatusCreated {
+		t.Fatalf("registers expected 201, got [%d, %d]", registerDefault.Status, registerOther.Status)
+	}
+
+	var defaultAuth authResponse
+	var otherAuth authResponse
+	if err := json.Unmarshal(registerDefault.Body, &defaultAuth); err != nil {
+		t.Fatalf("unmarshal default auth: %v", err)
+	}
+	if err := json.Unmarshal(registerOther.Body, &otherAuth); err != nil {
+		t.Fatalf("unmarshal other auth: %v", err)
+	}
+
+	moveUserToOrganization(t, pool, otherAuth.User.ID, otherOrgID)
+
+	loginOther := doRequest(t, router, http.MethodPost, "/auth/login", map[string]string{
+		"email":    otherEmail,
+		"password": password,
+	}, "")
+	if loginOther.Status != http.StatusOK {
+		t.Fatalf("other org login expected 200, got %d body=%s", loginOther.Status, string(loginOther.Body))
+	}
+	if err := json.Unmarshal(loginOther.Body, &otherAuth); err != nil {
+		t.Fatalf("unmarshal other login auth: %v", err)
+	}
+	if otherAuth.User.OrganizationID != otherOrgID {
+		t.Fatalf("expected moved user organization %s, got %s", otherOrgID, otherAuth.User.OrganizationID)
+	}
+
+	createForeignPost := doRequest(t, router, http.MethodPost, "/posts", map[string]string{
+		"title": "Other org post",
+		"body":  "This should stay inside its tenant.",
+	}, otherAuth.Token)
+	if createForeignPost.Status != http.StatusCreated {
+		t.Fatalf("other org create post expected 201, got %d body=%s", createForeignPost.Status, string(createForeignPost.Body))
+	}
+	var foreignPost postResponse
+	if err := json.Unmarshal(createForeignPost.Body, &foreignPost); err != nil {
+		t.Fatalf("unmarshal foreign post: %v", err)
+	}
+
+	usersList := doRequest(t, router, http.MethodGet, "/users", nil, defaultAuth.Token)
+	if usersList.Status != http.StatusOK {
+		t.Fatalf("/users expected 200, got %d body=%s", usersList.Status, string(usersList.Body))
+	}
+	var usersPayload usersResponse
+	if err := json.Unmarshal(usersList.Body, &usersPayload); err != nil {
+		t.Fatalf("unmarshal /users payload: %v", err)
+	}
+	if containsUser(usersPayload.Users, otherAuth.User.ID) {
+		t.Fatalf("expected cross-tenant user to be hidden from /users")
+	}
+
+	userByID := doRequest(t, router, http.MethodGet, "/users/"+otherAuth.User.ID, nil, defaultAuth.Token)
+	if userByID.Status != http.StatusNotFound {
+		t.Fatalf("cross-tenant /users/:id expected 404, got %d body=%s", userByID.Status, string(userByID.Body))
+	}
+
+	listPosts := doRequest(t, router, http.MethodGet, "/posts", nil, defaultAuth.Token)
+	if listPosts.Status != http.StatusOK {
+		t.Fatalf("/posts expected 200, got %d body=%s", listPosts.Status, string(listPosts.Body))
+	}
+	var postsPayload postsResponse
+	if err := json.Unmarshal(listPosts.Body, &postsPayload); err != nil {
+		t.Fatalf("unmarshal /posts payload: %v", err)
+	}
+	if containsPost(postsPayload.Posts, foreignPost.ID) {
+		t.Fatalf("expected cross-tenant post to be hidden from /posts")
+	}
+
+	getForeignPost := doRequest(t, router, http.MethodGet, "/posts/"+foreignPost.ID, nil, defaultAuth.Token)
+	if getForeignPost.Status != http.StatusNotFound {
+		t.Fatalf("cross-tenant /posts/:id expected 404, got %d body=%s", getForeignPost.Status, string(getForeignPost.Body))
+	}
+
+	listForeignComments := doRequest(t, router, http.MethodGet, "/posts/"+foreignPost.ID+"/comments", nil, defaultAuth.Token)
+	if listForeignComments.Status != http.StatusNotFound {
+		t.Fatalf("cross-tenant /posts/:id/comments expected 404, got %d body=%s", listForeignComments.Status, string(listForeignComments.Body))
+	}
+
+	sendCrossTenantMessage := doRequest(t, router, http.MethodPost, "/chats/"+otherAuth.User.ID+"/messages", map[string]string{
+		"content": "should not cross tenants",
+	}, defaultAuth.Token)
+	if sendCrossTenantMessage.Status != http.StatusNotFound {
+		t.Fatalf("cross-tenant chat send expected 404, got %d body=%s", sendCrossTenantMessage.Status, string(sendCrossTenantMessage.Body))
+	}
+}
+
 func setupTestRouter(t *testing.T) (*gin.Engine, *pgxpool.Pool) {
 	t.Helper()
 
@@ -764,6 +922,43 @@ func cleanupUsers(t *testing.T, pool *pgxpool.Pool, emails []string) {
 	_, err := pool.Exec(context.Background(), `DELETE FROM users WHERE email = ANY($1)`, emails)
 	if err != nil {
 		t.Fatalf("cleanup users: %v", err)
+	}
+}
+
+func createOrganization(t *testing.T, pool *pgxpool.Pool, slug, name string) string {
+	t.Helper()
+	var organizationID string
+	err := pool.QueryRow(context.Background(), `
+		INSERT INTO organizations (slug, name)
+		VALUES ($1, $2)
+		RETURNING id
+	`, slug, name).Scan(&organizationID)
+	if err != nil {
+		t.Fatalf("create organization: %v", err)
+	}
+	return organizationID
+}
+
+func moveUserToOrganization(t *testing.T, pool *pgxpool.Pool, userID, organizationID string) {
+	t.Helper()
+	commandTag, err := pool.Exec(context.Background(), `
+		UPDATE users
+		SET organization_id = $2
+		WHERE id = $1
+	`, userID, organizationID)
+	if err != nil {
+		t.Fatalf("move user to organization: %v", err)
+	}
+	if commandTag.RowsAffected() != 1 {
+		t.Fatalf("expected 1 moved user, got %d", commandTag.RowsAffected())
+	}
+}
+
+func cleanupOrganizations(t *testing.T, pool *pgxpool.Pool, organizationIDs []string) {
+	t.Helper()
+	_, err := pool.Exec(context.Background(), `DELETE FROM organizations WHERE id = ANY($1)`, organizationIDs)
+	if err != nil {
+		t.Fatalf("cleanup organizations: %v", err)
 	}
 }
 

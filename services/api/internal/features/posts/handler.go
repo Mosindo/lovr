@@ -19,9 +19,15 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) List(c *gin.Context) {
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "posts.list.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
 	limit := parseBoundedLimit(c.Query("limit"), 20, 100)
 	offset := parseNonNegativeInt(c.Query("offset"), 0)
-	posts, err := h.service.ListWithPagination(c.Request.Context(), limit, offset)
+	posts, err := h.service.ListWithPagination(c.Request.Context(), organizationID, limit, offset)
 	if err != nil {
 		logger.LogHandlerError(c, "posts.list", http.StatusInternalServerError, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch posts"})
@@ -38,6 +44,12 @@ func (h *Handler) List(c *gin.Context) {
 
 func (h *Handler) Create(c *gin.Context) {
 	userID := c.GetString("userID")
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "posts.create.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
 
 	var req CreatePostRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -46,7 +58,7 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 
-	post, err := h.service.Create(c.Request.Context(), userID, req.Title, req.Body)
+	post, err := h.service.Create(c.Request.Context(), organizationID, userID, req.Title, req.Body)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
@@ -69,6 +81,12 @@ func (h *Handler) Create(c *gin.Context) {
 }
 
 func (h *Handler) GetByID(c *gin.Context) {
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "posts.get.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
 	postID := strings.TrimSpace(c.Param("postId"))
 	if !isUUIDLike(postID) {
 		logger.LogHandlerError(c, "posts.get.validate_post_id", http.StatusBadRequest, errors.New("invalid post id"))
@@ -76,7 +94,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 		return
 	}
 
-	post, err := h.service.GetByID(c.Request.Context(), postID)
+	post, err := h.service.GetByID(c.Request.Context(), organizationID, postID)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {

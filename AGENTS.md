@@ -87,6 +87,9 @@ Rules:
 - No SQL in handlers
 - Shared concerns belong in `platform`
 - Domain concerns belong in `features`
+- Never break existing modules while extending the platform
+- Respect the Go backend structure: `handler -> service -> repository`
+- Respect the frontend API client abstraction; no direct network access from UI code
 
 ---
 
@@ -143,6 +146,7 @@ Before any backend delivery:
 - `gofmt ./...`
 - `go test ./...`
 - `go build ./cmd/api`
+- Frontend/API changes must also keep `npm ci` and `npx tsc --noEmit` healthy in `apps/mobile`
 
 If tests fail: fix them before continuing.
 

@@ -8,23 +8,21 @@ import {
   TextInput,
   View
 } from "react-native";
-import { login, register, type AuthUser } from "../api/auth";
+import { useLogin, useRegister } from "../hooks/useAuth";
 
 type Mode = "login" | "register";
 
-type AuthScreenProps = {
-  onAuthenticated: (token: string, user: AuthUser) => void;
-};
-
-export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
+export default function AuthScreen() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
+  const loginMutation = useLogin();
+  const registerMutation = useRegister();
 
   const title = useMemo(() => (mode === "login" ? "Login" : "Create account"), [mode]);
   const switchLabel = mode === "login" ? "Need an account? Register" : "Already have an account? Login";
+  const submitting = loginMutation.isPending || registerMutation.isPending;
 
   async function onSubmit() {
     const normalizedEmail = email.trim().toLowerCase();
@@ -33,19 +31,16 @@ export default function AuthScreen({ onAuthenticated }: AuthScreenProps) {
       return;
     }
 
-    setSubmitting(true);
     setError(null);
 
     try {
-      const authResult =
-        mode === "login"
-          ? await login(normalizedEmail, password)
-          : await register(normalizedEmail, password);
-      onAuthenticated(authResult.token, authResult.user);
+      if (mode === "login") {
+        await loginMutation.mutateAsync({ email: normalizedEmail, password });
+      } else {
+        await registerMutation.mutateAsync({ email: normalizedEmail, password });
+      }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "authentication failed");
-    } finally {
-      setSubmitting(false);
     }
   }
 

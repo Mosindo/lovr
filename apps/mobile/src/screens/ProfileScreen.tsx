@@ -9,12 +9,12 @@ import {
   View
 } from "react-native";
 import { type AuthUser } from "../api/auth";
+import { useAuth } from "../hooks/useAuth";
 import { listUsers, type PlatformUser } from "../api/platform";
 
 type ProfileScreenProps = {
   user: AuthUser;
   token: string;
-  onLogout: () => void;
 };
 
 function formatMemberDate(value: string): string {
@@ -25,10 +25,11 @@ function formatMemberDate(value: string): string {
   return date.toLocaleDateString();
 }
 
-export default function ProfileScreen({ user, token, onLogout }: ProfileScreenProps) {
+export default function ProfileScreen({ user, token }: ProfileScreenProps) {
   const [users, setUsers] = useState<PlatformUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { logout, isLoggingOut } = useAuth();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,11 +78,14 @@ export default function ProfileScreen({ user, token, onLogout }: ProfileScreenPr
         <Text style={styles.label}>User ID</Text>
         <Text style={styles.value}>{user.id}</Text>
 
+        <Text style={styles.label}>Organization</Text>
+        <Text style={styles.value}>{user.organizationId}</Text>
+
         <Text style={styles.label}>Member since</Text>
         <Text style={styles.value}>{formatMemberDate(user.createdAt)}</Text>
 
-        <Pressable onPress={onLogout} style={styles.button} testID="profile-logout-button">
-          <Text style={styles.buttonText}>Logout</Text>
+        <Pressable disabled={isLoggingOut} onPress={logout} style={styles.button} testID="profile-logout-button">
+          <Text style={styles.buttonText}>{isLoggingOut ? "Logging out..." : "Logout"}</Text>
         </Pressable>
       </View>
 

@@ -27,8 +27,8 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) ListChats(ctx context.Context, userID string) ([]ChatSummary, error) {
-	chats, err := s.repo.ListChats(ctx, userID)
+func (s *Service) ListChats(ctx context.Context, organizationID, userID string) ([]ChatSummary, error) {
+	chats, err := s.repo.ListChats(ctx, organizationID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -52,10 +52,10 @@ func (s *Service) ListChats(ctx context.Context, userID string) ([]ChatSummary, 
 	return payload, nil
 }
 
-func (s *Service) ListChatsWithPagination(ctx context.Context, userID string, limit, offset int) ([]ChatSummary, error) {
+func (s *Service) ListChatsWithPagination(ctx context.Context, organizationID, userID string, limit, offset int) ([]ChatSummary, error) {
 	normalizedLimit := normalizeChatsLimit(limit)
 	normalizedOffset := normalizeChatsOffset(offset)
-	chats, err := s.repo.ListChatsWithPagination(ctx, userID, normalizedLimit, normalizedOffset)
+	chats, err := s.repo.ListChatsWithPagination(ctx, organizationID, userID, normalizedLimit, normalizedOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -79,12 +79,12 @@ func (s *Service) ListChatsWithPagination(ctx context.Context, userID string, li
 	return payload, nil
 }
 
-func (s *Service) ListMessages(ctx context.Context, userID, otherUserID string) ([]ChatMessage, error) {
-	return s.ListMessagesWithLimit(ctx, userID, otherUserID, defaultChatMessagesLimit)
+func (s *Service) ListMessages(ctx context.Context, organizationID, userID, otherUserID string) ([]ChatMessage, error) {
+	return s.ListMessagesWithLimit(ctx, organizationID, userID, otherUserID, defaultChatMessagesLimit)
 }
 
-func (s *Service) ListMessagesWithLimit(ctx context.Context, userID, otherUserID string, limit int) ([]ChatMessage, error) {
-	if err := s.ensureCanChat(ctx, userID, otherUserID); err != nil {
+func (s *Service) ListMessagesWithLimit(ctx context.Context, organizationID, userID, otherUserID string, limit int) ([]ChatMessage, error) {
+	if err := s.ensureCanChat(ctx, organizationID, userID, otherUserID); err != nil {
 		return nil, err
 	}
 
@@ -106,8 +106,8 @@ func (s *Service) ListMessagesWithLimit(ctx context.Context, userID, otherUserID
 	return payload, nil
 }
 
-func (s *Service) SendMessage(ctx context.Context, userID, otherUserID, content string) (ChatMessage, error) {
-	if err := s.ensureCanChat(ctx, userID, otherUserID); err != nil {
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, otherUserID, content string) (ChatMessage, error) {
+	if err := s.ensureCanChat(ctx, organizationID, userID, otherUserID); err != nil {
 		return ChatMessage{}, err
 	}
 
@@ -130,8 +130,8 @@ func (s *Service) SendMessage(ctx context.Context, userID, otherUserID, content 
 	}, nil
 }
 
-func (s *Service) ensureCanChat(ctx context.Context, userID, otherUserID string) error {
-	exists, err := s.repo.UserExists(ctx, otherUserID)
+func (s *Service) ensureCanChat(ctx context.Context, organizationID, userID, otherUserID string) error {
+	exists, err := s.repo.UserExists(ctx, organizationID, otherUserID)
 	if err != nil {
 		return ErrValidateChatTarget
 	}

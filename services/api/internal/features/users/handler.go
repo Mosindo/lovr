@@ -19,9 +19,16 @@ func NewHandler(service *Service) *Handler {
 }
 
 func (h *Handler) List(c *gin.Context) {
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "users.list.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing organization"})
+		return
+	}
+
 	limit := parseBoundedLimit(c.Query("limit"), 20, 100)
 	offset := parseNonNegativeInt(c.Query("offset"), 0)
-	users, err := h.service.ListWithPagination(c.Request.Context(), limit, offset)
+	users, err := h.service.ListWithPagination(c.Request.Context(), organizationID, limit, offset)
 	if err != nil {
 		logger.LogHandlerError(c, "users.list", http.StatusInternalServerError, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch users"})
@@ -31,9 +38,10 @@ func (h *Handler) List(c *gin.Context) {
 	payload := make([]UserResponse, 0, len(users))
 	for _, user := range users {
 		payload = append(payload, UserResponse{
-			ID:        user.ID,
-			Email:     user.Email,
-			CreatedAt: user.CreatedAt,
+			ID:             user.ID,
+			Email:          user.Email,
+			OrganizationID: user.OrganizationID,
+			CreatedAt:      user.CreatedAt,
 		})
 	}
 
@@ -41,6 +49,13 @@ func (h *Handler) List(c *gin.Context) {
 }
 
 func (h *Handler) GetByID(c *gin.Context) {
+	organizationID := strings.TrimSpace(c.GetString("organizationID"))
+	if organizationID == "" {
+		logger.LogHandlerError(c, "users.get.organization", http.StatusUnauthorized, errors.New("missing organization"))
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing organization"})
+		return
+	}
+
 	userID := strings.TrimSpace(c.Param("userId"))
 	if !isUUIDLike(userID) {
 		logger.LogHandlerError(c, "users.get.validate_user_id", http.StatusBadRequest, errors.New("invalid user id"))
@@ -48,7 +63,7 @@ func (h *Handler) GetByID(c *gin.Context) {
 		return
 	}
 
-	user, err := h.service.GetByID(c.Request.Context(), userID)
+	user, err := h.service.GetByID(c.Request.Context(), organizationID, userID)
 	if err != nil {
 		status := http.StatusInternalServerError
 		switch {
@@ -63,9 +78,10 @@ func (h *Handler) GetByID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, UserResponse{
-		ID:        user.ID,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt,
+		ID:             user.ID,
+		Email:          user.Email,
+		OrganizationID: user.OrganizationID,
+		CreatedAt:      user.CreatedAt,
 	})
 }
 

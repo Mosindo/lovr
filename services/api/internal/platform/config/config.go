@@ -3,19 +3,28 @@ package config
 import (
 	"errors"
 	"os"
+	"strings"
 )
 
 type Config struct {
-	Port        string
-	DatabaseURL string
-	JWTSecret   string
+	Port                string
+	DatabaseURL         string
+	JWTSecret           string
+	StripeSecretKey     string
+	StripeWebhookSecret string
+	StripePriceID       string
+	AppBaseURL          string
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		Port:        getenv("PORT", "8080"),
-		DatabaseURL: os.Getenv("DATABASE_URL"),
-		JWTSecret:   os.Getenv("JWT_SECRET"),
+		Port:                getenv("PORT", "8080"),
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		JWTSecret:           os.Getenv("JWT_SECRET"),
+		StripeSecretKey:     strings.TrimSpace(os.Getenv("STRIPE_SECRET_KEY")),
+		StripeWebhookSecret: strings.TrimSpace(os.Getenv("STRIPE_WEBHOOK_SECRET")),
+		StripePriceID:       strings.TrimSpace(os.Getenv("STRIPE_PRICE_ID")),
+		AppBaseURL:          strings.TrimSpace(os.Getenv("APP_BASE_URL")),
 	}
 
 	if cfg.DatabaseURL == "" {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
@@ -8,8 +8,7 @@ import ChatScreen from "./src/screens/ChatScreen";
 import HomeScreen from "./src/screens/HomeScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
-import { me, type AuthUser } from "./src/api/auth";
-import { clearToken, getToken, saveToken } from "./src/store/tokenStore";
+import { AuthProvider, useAuth } from "./src/hooks/useAuth";
 
 export type RootTabParamList = {
   Home: undefined;
@@ -20,57 +19,10 @@ export type RootTabParamList = {
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
-export default function App() {
-  const [booting, setBooting] = useState(true);
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<AuthUser | null>(null);
+function AppShell() {
+  const { accessToken, authError, isAuthenticated, isBooting, user } = useAuth();
 
-  useEffect(() => {
-    let active = true;
-
-    async function restoreSession() {
-      try {
-        const storedToken = await getToken();
-        if (!storedToken || !active) {
-          return;
-        }
-
-        const meUser = await me(storedToken);
-        if (!active) {
-          return;
-        }
-
-        setToken(storedToken);
-        setUser(meUser);
-      } catch {
-        await clearToken();
-      } finally {
-        if (active) {
-          setBooting(false);
-        }
-      }
-    }
-
-    restoreSession();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function handleAuthenticated(nextToken: string, nextUser: AuthUser) {
-    await saveToken(nextToken);
-    setToken(nextToken);
-    setUser(nextUser);
-  }
-
-  async function handleLogout() {
-    await clearToken();
-    setToken(null);
-    setUser(null);
-  }
-
-  if (booting) {
+  if (isBooting) {
     return (
       <SafeAreaView style={styles.bootContainer}>
         <StatusBar style="auto" />
@@ -79,11 +31,12 @@ export default function App() {
     );
   }
 
-  if (!token || !user) {
+  if (!isAuthenticated || !accessToken || !user) {
     return (
       <>
         <StatusBar style="auto" />
-        <AuthScreen onAuthenticated={handleAuthenticated} />
+        <AuthScreen />
+        {authError ? <SafeAreaView style={styles.authErrorWrap}><ActivityIndicator size="small" color="#111827" /></SafeAreaView> : null}
       </>
     );
   }
@@ -93,19 +46,27 @@ export default function App() {
       <StatusBar style="auto" />
       <Tab.Navigator screenOptions={{ headerShown: false }}>
         <Tab.Screen name="Home">
-          {() => <HomeScreen currentUserId={user.id} token={token} />}
+          {() => <HomeScreen currentUserId={user.id} token={accessToken} />}
         </Tab.Screen>
         <Tab.Screen name="Chat">
-          {() => <ChatScreen currentUserId={user.id} token={token} />}
+          {() => <ChatScreen currentUserId={user.id} token={accessToken} />}
         </Tab.Screen>
         <Tab.Screen name="Notifications">
-          {() => <NotificationsScreen token={token} />}
+          {() => <NotificationsScreen token={accessToken} />}
         </Tab.Screen>
         <Tab.Screen name="Profile">
-          {() => <ProfileScreen onLogout={handleLogout} token={token} user={user} />}
+          {() => <ProfileScreen token={accessToken} user={user} />}
         </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }
 
@@ -115,5 +76,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#f9fafb"
+  },
+  authErrorWrap: {
+    position: "absolute",
+    bottom: 24,
+    left: 24,
+    right: 24,
+    alignItems: "center"
   }
 });

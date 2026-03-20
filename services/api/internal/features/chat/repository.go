@@ -10,11 +10,11 @@ import (
 )
 
 type Repository interface {
-	ListChats(ctx context.Context, userID string) ([]ChatSummary, error)
-	ListChatsWithPagination(ctx context.Context, userID string, limit, offset int) ([]ChatSummary, error)
+	ListChats(ctx context.Context, organizationID, userID string) ([]ChatSummary, error)
+	ListChatsWithPagination(ctx context.Context, organizationID, userID string, limit, offset int) ([]ChatSummary, error)
 	ListMessages(ctx context.Context, userID, otherUserID string, limit int) ([]ChatMessage, error)
 	CreateMessage(ctx context.Context, userID, otherUserID, content string) (ChatMessage, error)
-	UserExists(ctx context.Context, userID string) (bool, error)
+	UserExists(ctx context.Context, organizationID, userID string) (bool, error)
 }
 
 type PGRepository struct {
@@ -25,11 +25,11 @@ func NewPGRepository(dbPool *pgxpool.Pool) *PGRepository {
 	return &PGRepository{dbPool: dbPool}
 }
 
-func (r *PGRepository) ListChats(ctx context.Context, userID string) ([]ChatSummary, error) {
-	return r.ListChatsWithPagination(ctx, userID, 100, 0)
+func (r *PGRepository) ListChats(ctx context.Context, organizationID, userID string) ([]ChatSummary, error) {
+	return r.ListChatsWithPagination(ctx, organizationID, userID, 100, 0)
 }
 
-func (r *PGRepository) ListChatsWithPagination(ctx context.Context, userID string, limit, offset int) ([]ChatSummary, error) {
+func (r *PGRepository) ListChatsWithPagination(ctx context.Context, organizationID, userID string, limit, offset int) ([]ChatSummary, error) {
 	rows, err := r.dbPool.Query(ctx, `
 		SELECT
 			u.id,
@@ -46,6 +46,7 @@ func (r *PGRepository) ListChatsWithPagination(ctx context.Context, userID strin
 		 AND other_cp.user_id <> $1
 		JOIN users u
 		  ON u.id = other_cp.user_id
+		 AND u.organization_id = $2
 		LEFT JOIN LATERAL (
 			SELECT m.content, m.created_at
 			FROM messages m
@@ -55,8 +56,8 @@ func (r *PGRepository) ListChatsWithPagination(ctx context.Context, userID strin
 		) lm ON true
 		WHERE c.kind = 'direct'
 		ORDER BY COALESCE(lm.created_at, c.updated_at, c.created_at) DESC, u.id DESC
-		LIMIT $2 OFFSET $3
-	`, userID, limit, offset)
+		LIMIT $3 OFFSET $4
+	`, userID, organizationID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -165,15 +166,16 @@ func (r *PGRepository) CreateMessage(ctx context.Context, userID, otherUserID, c
 	return message, nil
 }
 
-func (r *PGRepository) UserExists(ctx context.Context, userID string) (bool, error) {
+func (r *PGRepository) UserExists(ctx context.Context, organizationID, userID string) (bool, error) {
 	var exists bool
 	err := r.dbPool.QueryRow(ctx, `
 		SELECT EXISTS (
 			SELECT 1
 			FROM users
 			WHERE id = $1
+			  AND organization_id = $2
 		)
-	`, userID).Scan(&exists)
+	`, userID, organizationID).Scan(&exists)
 	if err != nil {
 		return false, err
 	}

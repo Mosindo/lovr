@@ -1,4 +1,4 @@
-import { getToken as getTokenFromStore } from "../store/tokenStore";
+import { getAccessToken } from "../store/tokenStore";
 
 export type ApiErrorPayload = {
   error?: string;
@@ -20,7 +20,7 @@ export class ApiError extends Error {
 
 // Placeholder indirection for JWT injection.
 async function getToken(): Promise<string | null> {
-  return getTokenFromStore();
+  return getAccessToken();
 }
 
 function mergeHeaders(base: HeadersInit | undefined, injected?: Record<string, string>): Headers {
@@ -99,4 +99,3 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
     clearTimeout(timeoutId);
   }
 }
-
