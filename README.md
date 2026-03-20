@@ -1,6 +1,6 @@
-# Fullstack Boilerplate
+# go-react-saas
 
-A reusable fullstack monorepo for building social networks, forums, SaaS products, marketplaces, and community apps with a shared Go API, PostgreSQL database, Docker-based infrastructure, and React / React Native clients.
+`go-react-saas` is a reusable fullstack monorepo for building social networks, forums, SaaS products, marketplaces, and community apps with a shared Go API, PostgreSQL database, Docker-based infrastructure, and React / React Native clients.
 
 ## Project Overview
 
@@ -14,6 +14,8 @@ This repository provides a production-minded starting point for fullstack produc
 - predictable smoke and QA scripts
 
 The codebase is intentionally generic. Core modules can be composed and extended without assuming a single business vertical.
+
+The default Docker Compose project name is `go-react-saas`, which keeps generated container, network, and volume names stable across environments.
 
 ## Stack Description
 

@@ -1,6 +1,6 @@
-# AGENTS.md - Fullstack Boilerplate
+# AGENTS.md - go-react-saas
 
-This repository is a reusable fullstack boilerplate.
+This repository is `go-react-saas`, a reusable fullstack boilerplate.
 The architecture must remain scalable, secure, maintainable, and easy to evolve across product types.
 
 ---
