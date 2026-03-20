@@ -8,6 +8,8 @@ This repository provides a production-minded starting point for fullstack produc
 - a typed mobile frontend
 - a modular Go API
 - explicit PostgreSQL persistence
+- session-based authentication with refresh-token rotation
+- multi-tenant SaaS foundations with organizations and subscriptions
 - containerized local development
 - predictable smoke and QA scripts
 
@@ -20,7 +22,7 @@ The codebase is intentionally generic. Core modules can be composed and extended
 - Gin
 - PostgreSQL
 - `pgxpool`
-- JWT authentication
+- JWT authentication with access tokens + refresh tokens
 - explicit SQL queries without an ORM
 
 ### Frontend
@@ -28,6 +30,7 @@ The codebase is intentionally generic. Core modules can be composed and extended
 - React-compatible structure for additional clients
 - TypeScript
 - React Navigation
+- React Query for auth/session orchestration
 
 ### Infrastructure
 - Docker
@@ -78,7 +81,7 @@ The API uses a feature-first structure with a small shared platform layer.
 
 - `services/api/cmd/api/main.go` is the composition root
 - `services/api/internal/platform` contains cross-cutting concerns such as config, database setup, middleware, logging, and shared errors
-- `services/api/internal/features` contains domain modules such as `auth`, `users`, `chat`, `posts`, `comments`, `notifications`, and `files`
+- `services/api/internal/features` contains domain modules such as `auth`, `users`, `chat`, `posts`, `comments`, `notifications`, `files`, and `billing`
 
 Each feature follows the same shape:
 - `handler.go`
@@ -99,12 +102,14 @@ The mobile app is organized around generic product surfaces:
 - chat
 - notifications
 - profile
+- session restoration and refresh-token aware auth state
 
 Within `apps/mobile/src`:
 - `api` contains REST clients
+- `hooks` contains React Query-powered auth/session hooks
 - `screens` contains route-level UI
 - `components/ui` contains reusable UI building blocks
-- `store` contains session persistence
+- `store` contains token/session persistence
 - `theme` contains shared design tokens
 - `utils` contains shared helpers
 
@@ -125,14 +130,14 @@ PowerShell:
 
 ```powershell
 $env:JWT_SECRET='change-me-in-dev'
-docker compose -f infra/docker-compose.yml up --build -d
+docker compose up --build -d
 ```
 
 Bash:
 
 ```bash
 export JWT_SECRET='change-me-in-dev'
-docker compose -f infra/docker-compose.yml up --build -d
+docker compose up --build -d
 ```
 
 The API is exposed on `http://localhost:18080`.
@@ -220,6 +225,12 @@ Use the existing vertical-slice pattern and keep naming generic.
 4. Keep SQL in repositories and HTTP concerns in handlers.
 5. Register the feature in `services/api/cmd/api/main.go`.
 6. Add tests before expanding the public API surface.
+
+Current SaaS-oriented backend foundations include:
+- organizations for tenant identity
+- sessions for refresh-token lifecycle
+- subscriptions for billing state
+- billing endpoints for Stripe checkout and webhook flows
 
 ### Frontend
 1. Add API client functions in `apps/mobile/src/api`.

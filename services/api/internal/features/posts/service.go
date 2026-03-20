@@ -24,10 +24,10 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) ListWithPagination(ctx context.Context, limit, offset int) ([]Post, error) {
+func (s *Service) ListWithPagination(ctx context.Context, organizationID string, limit, offset int) ([]Post, error) {
 	normalizedLimit := normalizePostsLimit(limit)
 	normalizedOffset := normalizePostsOffset(offset)
-	posts, err := s.repo.ListPosts(ctx, normalizedLimit, normalizedOffset)
+	posts, err := s.repo.ListPosts(ctx, organizationID, normalizedLimit, normalizedOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (s *Service) ListWithPagination(ctx context.Context, limit, offset int) ([]
 	return payload, nil
 }
 
-func (s *Service) Create(ctx context.Context, authorUserID, title, body string) (Post, error) {
+func (s *Service) Create(ctx context.Context, organizationID, authorUserID, title, body string) (Post, error) {
 	normalizedTitle := strings.TrimSpace(title)
 	if normalizedTitle == "" {
 		return Post{}, ErrTitleRequired
@@ -50,7 +50,7 @@ func (s *Service) Create(ctx context.Context, authorUserID, title, body string) 
 		return Post{}, ErrBodyRequired
 	}
 
-	post, err := s.repo.CreatePost(ctx, authorUserID, normalizedTitle, normalizedBody)
+	post, err := s.repo.CreatePost(ctx, organizationID, authorUserID, normalizedTitle, normalizedBody)
 	if err != nil {
 		return Post{}, err
 	}
@@ -58,8 +58,8 @@ func (s *Service) Create(ctx context.Context, authorUserID, title, body string) 
 	return mapStoredPost(post), nil
 }
 
-func (s *Service) GetByID(ctx context.Context, postID string) (Post, error) {
-	post, err := s.repo.GetPostByID(ctx, postID)
+func (s *Service) GetByID(ctx context.Context, organizationID, postID string) (Post, error) {
+	post, err := s.repo.GetPostByID(ctx, organizationID, postID)
 	if err != nil {
 		if errors.Is(err, ErrPostNotFound) {
 			return Post{}, ErrPostNotFound

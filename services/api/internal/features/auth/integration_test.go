@@ -24,36 +24,65 @@ func TestAuthServiceRegisterLoginMe(t *testing.T) {
 	password := "Password123"
 	defer cleanupUsers(t, pool, []string{email})
 
-	token, user, err := svc.Register(context.Background(), "  "+strings.ToUpper(email)+"  ", password)
+	tokens, user, err := svc.Register(context.Background(), "  "+strings.ToUpper(email)+"  ", password, "auth-test-agent", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("register: %v", err)
 	}
-	if token == "" {
-		t.Fatalf("expected non-empty token")
+	if tokens.AccessToken == "" || tokens.RefreshToken == "" {
+		t.Fatalf("expected non-empty access and refresh tokens")
 	}
 	if user.Email != email {
 		t.Fatalf("expected normalized email %q, got %q", email, user.Email)
 	}
+	if user.OrganizationID == "" {
+		t.Fatalf("expected organization id on registered user")
+	}
 
-	_, _, err = svc.Register(context.Background(), email, password)
+	_, _, err = svc.Register(context.Background(), email, password, "", "")
 	if !errors.Is(err, ErrEmailExists) {
 		t.Fatalf("expected ErrEmailExists, got %v", err)
 	}
 
-	_, _, err = svc.Login(context.Background(), email, "wrong-password")
+	_, _, err = svc.Login(context.Background(), email, "wrong-password", "", "")
 	if !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 	}
 
-	loginToken, loggedIn, err := svc.Login(context.Background(), email, password)
+	loginTokens, loggedIn, err := svc.Login(context.Background(), email, password, "auth-test-agent", "127.0.0.1")
 	if err != nil {
 		t.Fatalf("login: %v", err)
 	}
-	if loginToken == "" {
-		t.Fatalf("expected non-empty login token")
+	if loginTokens.AccessToken == "" || loginTokens.RefreshToken == "" {
+		t.Fatalf("expected non-empty login tokens")
 	}
 	if loggedIn.ID != user.ID {
 		t.Fatalf("expected login user id %s, got %s", user.ID, loggedIn.ID)
+	}
+	if loggedIn.OrganizationID != user.OrganizationID {
+		t.Fatalf("expected login user organization id %s, got %s", user.OrganizationID, loggedIn.OrganizationID)
+	}
+
+	refreshedTokens, refreshedUser, err := svc.Refresh(context.Background(), loginTokens.RefreshToken, "auth-test-agent", "127.0.0.1")
+	if err != nil {
+		t.Fatalf("refresh: %v", err)
+	}
+	if refreshedTokens.AccessToken == "" || refreshedTokens.RefreshToken == "" {
+		t.Fatalf("expected non-empty refreshed tokens")
+	}
+	if refreshedTokens.RefreshToken == loginTokens.RefreshToken {
+		t.Fatalf("expected rotated refresh token")
+	}
+	if refreshedUser.OrganizationID != user.OrganizationID {
+		t.Fatalf("expected refreshed user organization id %s, got %s", user.OrganizationID, refreshedUser.OrganizationID)
+	}
+
+	if err := svc.Logout(context.Background(), refreshedTokens.RefreshToken); err != nil {
+		t.Fatalf("logout: %v", err)
+	}
+
+	_, _, err = svc.Refresh(context.Background(), refreshedTokens.RefreshToken, "auth-test-agent", "127.0.0.1")
+	if !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("expected ErrInvalidRefreshToken after logout, got %v", err)
 	}
 
 	meUser, err := svc.Me(context.Background(), user.ID)
@@ -62,6 +91,9 @@ func TestAuthServiceRegisterLoginMe(t *testing.T) {
 	}
 	if meUser.Email != email {
 		t.Fatalf("expected me email %q, got %q", email, meUser.Email)
+	}
+	if meUser.OrganizationID != user.OrganizationID {
+		t.Fatalf("expected me organization id %s, got %s", user.OrganizationID, meUser.OrganizationID)
 	}
 
 	_, err = svc.Me(context.Background(), "00000000-0000-0000-0000-000000000000")
@@ -85,20 +117,20 @@ func TestUsersServiceListAndGetByID(t *testing.T) {
 	password := "Password123"
 	defer cleanupUsers(t, pool, []string{email1, email2, email3})
 
-	_, user1, err := authSvc.Register(context.Background(), email1, password)
+	_, user1, err := authSvc.Register(context.Background(), email1, password, "", "")
 	if err != nil {
 		t.Fatalf("register user1: %v", err)
 	}
-	_, user2, err := authSvc.Register(context.Background(), email2, password)
+	_, user2, err := authSvc.Register(context.Background(), email2, password, "", "")
 	if err != nil {
 		t.Fatalf("register user2: %v", err)
 	}
-	_, user3, err := authSvc.Register(context.Background(), email3, password)
+	_, user3, err := authSvc.Register(context.Background(), email3, password, "", "")
 	if err != nil {
 		t.Fatalf("register user3: %v", err)
 	}
 
-	listed, err := usersSvc.ListWithPagination(context.Background(), 10, 0)
+	listed, err := usersSvc.ListWithPagination(context.Background(), user1.OrganizationID, 10, 0)
 	if err != nil {
 		t.Fatalf("list users: %v", err)
 	}
@@ -106,15 +138,18 @@ func TestUsersServiceListAndGetByID(t *testing.T) {
 		t.Fatalf("expected user list to contain all registered users")
 	}
 
-	gotUser, err := usersSvc.GetByID(context.Background(), user2.ID)
+	gotUser, err := usersSvc.GetByID(context.Background(), user1.OrganizationID, user2.ID)
 	if err != nil {
 		t.Fatalf("get user by id: %v", err)
 	}
 	if gotUser.Email != email2 {
 		t.Fatalf("expected user email %q, got %q", email2, gotUser.Email)
 	}
+	if gotUser.OrganizationID != user1.OrganizationID {
+		t.Fatalf("expected user organization id %s, got %s", user1.OrganizationID, gotUser.OrganizationID)
+	}
 
-	_, err = usersSvc.GetByID(context.Background(), "00000000-0000-0000-0000-000000000000")
+	_, err = usersSvc.GetByID(context.Background(), user1.OrganizationID, "00000000-0000-0000-0000-000000000000")
 	if !errors.Is(err, usersfeature.ErrUserNotFound) {
 		t.Fatalf("expected users ErrUserNotFound, got %v", err)
 	}
@@ -135,30 +170,30 @@ func TestChatServiceSendAndListFlow(t *testing.T) {
 	password := "Password123"
 	defer cleanupUsers(t, pool, []string{email1, email2, email3})
 
-	_, user1, err := authSvc.Register(context.Background(), email1, password)
+	_, user1, err := authSvc.Register(context.Background(), email1, password, "", "")
 	if err != nil {
 		t.Fatalf("register user1: %v", err)
 	}
-	_, user2, err := authSvc.Register(context.Background(), email2, password)
+	_, user2, err := authSvc.Register(context.Background(), email2, password, "", "")
 	if err != nil {
 		t.Fatalf("register user2: %v", err)
 	}
-	_, user3, err := authSvc.Register(context.Background(), email3, password)
+	_, user3, err := authSvc.Register(context.Background(), email3, password, "", "")
 	if err != nil {
 		t.Fatalf("register user3: %v", err)
 	}
 
-	_, err = chatSvc.SendMessage(context.Background(), user1.ID, "00000000-0000-0000-0000-000000000000", "should fail")
+	_, err = chatSvc.SendMessage(context.Background(), user1.OrganizationID, user1.ID, "00000000-0000-0000-0000-000000000000", "should fail")
 	if !errors.Is(err, chatfeature.ErrUserNotFound) {
 		t.Fatalf("expected ErrUserNotFound for missing recipient, got %v", err)
 	}
 
-	_, err = chatSvc.SendMessage(context.Background(), user1.ID, user2.ID, "   ")
+	_, err = chatSvc.SendMessage(context.Background(), user1.OrganizationID, user1.ID, user2.ID, "   ")
 	if !errors.Is(err, chatfeature.ErrMessageContentNeeded) {
 		t.Fatalf("expected ErrMessageContentNeeded, got %v", err)
 	}
 
-	sentToUser2, err := chatSvc.SendMessage(context.Background(), user1.ID, user2.ID, "hello service chat")
+	sentToUser2, err := chatSvc.SendMessage(context.Background(), user1.OrganizationID, user1.ID, user2.ID, "hello service chat")
 	if err != nil {
 		t.Fatalf("send message to user2: %v", err)
 	}
@@ -166,11 +201,11 @@ func TestChatServiceSendAndListFlow(t *testing.T) {
 		t.Fatalf("unexpected sent message content: %q", sentToUser2.Content)
 	}
 
-	if _, err := chatSvc.SendMessage(context.Background(), user1.ID, user3.ID, "hello third user"); err != nil {
+	if _, err := chatSvc.SendMessage(context.Background(), user1.OrganizationID, user1.ID, user3.ID, "hello third user"); err != nil {
 		t.Fatalf("send message to user3: %v", err)
 	}
 
-	messages, err := chatSvc.ListMessages(context.Background(), user1.ID, user2.ID)
+	messages, err := chatSvc.ListMessages(context.Background(), user1.OrganizationID, user1.ID, user2.ID)
 	if err != nil {
 		t.Fatalf("list messages: %v", err)
 	}
@@ -178,7 +213,7 @@ func TestChatServiceSendAndListFlow(t *testing.T) {
 		t.Fatalf("expected at least one message")
 	}
 
-	chats, err := chatSvc.ListChats(context.Background(), user1.ID)
+	chats, err := chatSvc.ListChats(context.Background(), user1.OrganizationID, user1.ID)
 	if err != nil {
 		t.Fatalf("list chats: %v", err)
 	}

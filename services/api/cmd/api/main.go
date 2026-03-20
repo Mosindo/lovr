@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"time"
 
 	authfeature "example.com/api/internal/features/auth"
+	billingfeature "example.com/api/internal/features/billing"
 	chatfeature "example.com/api/internal/features/chat"
 	commentsfeature "example.com/api/internal/features/comments"
 	filesfeature "example.com/api/internal/features/files"
@@ -21,8 +23,12 @@ import (
 )
 
 type app struct {
-	dbPool    *pgxpool.Pool
-	jwtSecret []byte
+	dbPool              *pgxpool.Pool
+	jwtSecret           []byte
+	stripeSecretKey     string
+	stripeWebhookSecret string
+	stripePriceID       string
+	appBaseURL          string
 }
 
 func main() {
@@ -42,7 +48,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	a := &app{dbPool: pool, jwtSecret: []byte(cfg.JWTSecret)}
+	a := &app{
+		dbPool:              pool,
+		jwtSecret:           []byte(cfg.JWTSecret),
+		stripeSecretKey:     cfg.StripeSecretKey,
+		stripeWebhookSecret: cfg.StripeWebhookSecret,
+		stripePriceID:       cfg.StripePriceID,
+		appBaseURL:          cfg.AppBaseURL,
+	}
 
 	r := setupRouter(a)
 
@@ -81,6 +94,15 @@ func setupRouter(a *app) *gin.Engine {
 	filesRepo := filesfeature.NewPGRepository(a.dbPool)
 	filesService := filesfeature.NewService(filesRepo)
 	filesHandler := filesfeature.NewHandler(filesService)
+	billingRepo := billingfeature.NewPGRepository(a.dbPool)
+	billingService := billingfeature.NewService(billingRepo, billingfeature.Config{
+		StripeSecretKey:     a.stripeSecretKey,
+		StripeWebhookSecret: a.stripeWebhookSecret,
+		StripePriceID:       a.stripePriceID,
+		AppBaseURL:          a.appBaseURL,
+		HTTPClient:          &http.Client{Timeout: 10 * time.Second},
+	})
+	billingHandler := billingfeature.NewHandler(billingService)
 	requireUser := middleware.RequireUser(a.jwtSecret)
 
 	r.GET("/health", platformhandlers.NewHealthHandler(a.dbPool))
@@ -91,5 +113,6 @@ func setupRouter(a *app) *gin.Engine {
 	commentsfeature.RegisterRoutes(r, commentsHandler, requireUser)
 	notificationsfeature.RegisterRoutes(r, notificationsHandler, requireUser)
 	filesfeature.RegisterRoutes(r, filesHandler, requireUser)
+	billingfeature.RegisterRoutes(r, billingHandler, requireUser)
 	return r
 }

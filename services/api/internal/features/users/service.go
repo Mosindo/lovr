@@ -23,13 +23,13 @@ func NewService(repo Repository) *Service {
 }
 
 func (s *Service) List(ctx context.Context) ([]User, error) {
-	return s.ListWithPagination(ctx, defaultUsersLimit, 0)
+	return s.ListWithPagination(ctx, "", defaultUsersLimit, 0)
 }
 
-func (s *Service) ListWithPagination(ctx context.Context, limit, offset int) ([]User, error) {
+func (s *Service) ListWithPagination(ctx context.Context, organizationID string, limit, offset int) ([]User, error) {
 	normalizedLimit := normalizeUsersLimit(limit)
 	normalizedOffset := normalizeOffset(offset)
-	users, err := s.repo.ListUsers(ctx, normalizedLimit, normalizedOffset)
+	users, err := s.repo.ListUsers(ctx, organizationID, normalizedLimit, normalizedOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -37,23 +37,24 @@ func (s *Service) ListWithPagination(ctx context.Context, limit, offset int) ([]
 	payload := make([]User, 0, len(users))
 	for _, user := range users {
 		payload = append(payload, User{
-			ID:        user.ID,
-			Email:     user.Email,
-			CreatedAt: user.CreatedAt,
+			ID:             user.ID,
+			Email:          user.Email,
+			OrganizationID: user.OrganizationID,
+			CreatedAt:      user.CreatedAt,
 		})
 	}
 	return payload, nil
 }
 
-func (s *Service) GetByID(ctx context.Context, userID string) (User, error) {
-	user, err := s.repo.GetUserByID(ctx, userID)
+func (s *Service) GetByID(ctx context.Context, organizationID, userID string) (User, error) {
+	user, err := s.repo.GetUserByID(ctx, organizationID, userID)
 	if err != nil {
 		if errors.Is(err, ErrUserNotFound) {
 			return User{}, ErrUserNotFound
 		}
 		return User{}, err
 	}
-	return User{ID: user.ID, Email: user.Email, CreatedAt: user.CreatedAt}, nil
+	return User{ID: user.ID, Email: user.Email, OrganizationID: user.OrganizationID, CreatedAt: user.CreatedAt}, nil
 }
 
 func normalizeUsersLimit(limit int) int {

@@ -24,8 +24,8 @@ func NewService(repo Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) ListByPost(ctx context.Context, postID string, limit, offset int) ([]Comment, error) {
-	exists, err := s.repo.PostExists(ctx, postID)
+func (s *Service) ListByPost(ctx context.Context, organizationID, postID string, limit, offset int) ([]Comment, error) {
+	exists, err := s.repo.PostExists(ctx, organizationID, postID)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (s *Service) ListByPost(ctx context.Context, postID string, limit, offset i
 
 	normalizedLimit := normalizeCommentsLimit(limit)
 	normalizedOffset := normalizeCommentsOffset(offset)
-	comments, err := s.repo.ListCommentsByPost(ctx, postID, normalizedLimit, normalizedOffset)
+	comments, err := s.repo.ListCommentsByPost(ctx, organizationID, postID, normalizedLimit, normalizedOffset)
 	if err != nil {
 		return nil, err
 	}
@@ -47,13 +47,13 @@ func (s *Service) ListByPost(ctx context.Context, postID string, limit, offset i
 	return payload, nil
 }
 
-func (s *Service) Create(ctx context.Context, postID, authorUserID, content string) (Comment, error) {
+func (s *Service) Create(ctx context.Context, organizationID, postID, authorUserID, content string) (Comment, error) {
 	normalizedContent := strings.TrimSpace(content)
 	if normalizedContent == "" {
 		return Comment{}, ErrCommentContentNeeded
 	}
 
-	comment, err := s.repo.CreateComment(ctx, postID, authorUserID, normalizedContent)
+	comment, err := s.repo.CreateComment(ctx, organizationID, postID, authorUserID, normalizedContent)
 	if err != nil {
 		if errors.Is(err, ErrCommentPostNotFound) {
 			return Comment{}, ErrPostNotFound

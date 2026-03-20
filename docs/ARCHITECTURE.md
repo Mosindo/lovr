@@ -34,6 +34,7 @@ services/api/
    │  └─ errors/
    └─ features/
       ├─ auth/
+      ├─ billing/
       ├─ users/
       ├─ files/
       ├─ chat/
@@ -45,6 +46,12 @@ services/api/
 `cmd/api/main.go` is the composition root. It wires the application together by loading configuration, opening the database, registering feature routes, and starting the HTTP server.
 
 Each feature folder groups everything needed for that domain. Instead of scattering handlers, services, and repositories across separate global folders, the code stays close to the feature it belongs to.
+
+Current notable backend modules:
+- `auth`: registration, login, refresh, logout, `/me`, JWT access tokens, refresh-token sessions
+- `billing`: checkout and webhook handling for subscription lifecycle
+- `users`: tenant-scoped directory access
+- `chat`, `posts`, `comments`: tenant-scoped shared content flows
 
 Each backend feature follows the same structure:
 - `handler.go`: receives HTTP requests, validates input, and returns HTTP responses
@@ -64,7 +71,7 @@ This pattern improves maintainability because:
 
 The `platform` layer contains infrastructure shared by all backend features.
 
-- `config/`: loads runtime configuration from environment variables such as `DATABASE_URL`, `JWT_SECRET`, and `PORT`
+- `config/`: loads runtime configuration from environment variables such as `DATABASE_URL`, `JWT_SECRET`, `PORT`, and optional Stripe billing keys
 - `db/`: initializes the PostgreSQL connection pool and runs embedded migrations
 - `middleware/`: contains reusable HTTP middleware such as auth checks, request metadata handling, and logging hooks
 - `logger/`: provides shared logging utilities so features do not each invent their own logging style
@@ -84,6 +91,9 @@ This is an intentional choice:
 
 The generic modules rely on core tables such as:
 - `users`: account records and identity data
+- `organizations`: tenant identity for multi-tenant SaaS isolation
+- `subscriptions`: billing state linked to organizations
+- `sessions`: refresh-token session persistence
 - `posts`: generic user-generated content
 - `comments`: responses attached to posts
 - `conversations`: chat threads
@@ -91,7 +101,12 @@ The generic modules rely on core tables such as:
 - `notifications`: system or user-facing notifications
 - `files`: uploaded file metadata and ownership
 
-Related support tables such as `sessions`, `conversation_participants`, and `votes` extend these core capabilities.
+Related support tables such as `conversation_participants` and `votes` extend these core capabilities.
+
+Multi-tenant isolation is centered on `organizations`:
+- users belong to an `organization_id`
+- subscriptions belong to an `organization_id`
+- tenant-scoped repository queries limit shared content and chat access by organization
 
 ## 5. Frontend Architecture
 
@@ -100,6 +115,7 @@ The mobile frontend lives under `apps/mobile/src/`:
 ```text
 apps/mobile/src/
 ├─ api/
+├─ hooks/
 ├─ components/
 ├─ screens/
 ├─ store/
@@ -109,13 +125,19 @@ apps/mobile/src/
 
 Responsibilities:
 - `api/`: HTTP client functions and endpoint wrappers
+- `hooks/`: React Query-powered auth/session hooks
 - `components/`: reusable UI building blocks
 - `screens/`: route-level UI and screen orchestration
-- `store/`: token persistence and lightweight client-side state
+- `store/`: access-token and refresh-token persistence
 - `theme/`: design tokens and shared styling primitives
 - `utils/`: shared helpers used across the app
 
 Screens should orchestrate the UI, while shared logic belongs in reusable modules such as API clients, helpers, components, and storage utilities. This keeps screens smaller and makes behavior easier to reuse across future clients.
+
+Session behavior is centralized:
+- auth state lives in hooks rather than screens
+- React Query owns current-user fetching and session restoration
+- screens consume hooks and API modules instead of issuing direct network requests
 
 ## 6. Adding a New Feature
 
