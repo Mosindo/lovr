@@ -706,7 +706,10 @@ func setupTestRouter(t *testing.T) (*gin.Engine, *pgxpool.Pool) {
 
 	databaseURL := os.Getenv("DATABASE_URL_TEST")
 	if databaseURL == "" {
-		databaseURL = "postgresql://app:app@localhost:5432/app?sslmode=disable"
+		databaseURL = os.Getenv("DATABASE_URL")
+	}
+	if databaseURL == "" {
+		t.Skip("skip integration tests: DATABASE_URL_TEST or DATABASE_URL must be set")
 	}
 
 	pool, err := db.Connect(context.Background(), databaseURL)

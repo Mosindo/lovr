@@ -7,6 +7,7 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,20 +38,20 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 20.19.4
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
 
       - name: Install frontend dependencies
         working-directory: apps/mobile
-        run: npm install
+        run: npm ci
 
       - name: Verify TypeScript
         working-directory: apps/mobile
         run: npx tsc --noEmit
 
       - name: Build Docker image
-        run: docker build services/api -t api-test
+        run: docker build -t api-test ./services/api
 
       - name: Verify Docker runtime (/health=200)
         shell: bash
@@ -59,15 +60,19 @@ jobs:
 
           cleanup() {
             docker rm -f api-test-run postgres-test >/dev/null 2>&1 || true
+            docker network rm api-test-network >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
 
+          docker network create api-test-network >/dev/null
+
           echo "Starting Postgres for container health verification..."
           docker run -d --name postgres-test \
+            --network api-test-network \
+            --network-alias postgres \
             -e POSTGRES_USER=postgres \
             -e POSTGRES_PASSWORD=postgres \
             -e POSTGRES_DB=app \
-            -p 5432:5432 \
             postgres:15-alpine >/dev/null
 
           echo "Waiting for Postgres readiness..."
@@ -79,15 +84,17 @@ jobs:
           done
 
           echo "Starting API container..."
-          docker run -d --name api-test-run --network host \
-            -e DATABASE_URL="postgres://postgres:postgres@localhost:5432/app?sslmode=disable" \
+          docker run -d --name api-test-run \
+            --network api-test-network \
+            -p 18081:8080 \
+            -e DATABASE_URL="postgres://postgres:postgres@postgres:5432/app?sslmode=disable" \
             -e JWT_SECRET="ci-dev-only-change-this" \
             -e PORT="8080" \
             api-test >/dev/null
 
           echo "Waiting for /health=200..."
           for i in {1..30}; do
-            code="$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:8080/health || true)"
+            code="$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:18081/health || true)"
             if [ "$code" = "200" ]; then
               echo "Health OK."
               exit 0
@@ -98,4 +105,3 @@ jobs:
           echo "Container logs (api-test-run):"
           docker logs api-test-run || true
           exit 1
-

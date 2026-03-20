@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,6 +24,38 @@ func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("ping db: %w", err)
 	}
 	return pool, nil
+}
+
+func ConnectWithRetry(ctx context.Context, databaseURL string, maxWait, retryInterval time.Duration) (*pgxpool.Pool, error) {
+	if maxWait <= 0 {
+		return Connect(ctx, databaseURL)
+	}
+	if retryInterval <= 0 {
+		retryInterval = time.Second
+	}
+
+	deadline := time.Now().Add(maxWait)
+	var lastErr error
+
+	for {
+		attemptCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		pool, err := Connect(attemptCtx, databaseURL)
+		cancel()
+		if err == nil {
+			return pool, nil
+		}
+		lastErr = err
+
+		if time.Now().After(deadline) {
+			return nil, fmt.Errorf("connect db after retry window %s: %w", maxWait, lastErr)
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("connect db canceled: %w", ctx.Err())
+		case <-time.After(retryInterval):
+		}
+	}
 }
 
 func RunMigrations(ctx context.Context, pool *pgxpool.Pool) error {

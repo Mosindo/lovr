@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	authfeature "example.com/api/internal/features/auth"
 	chatfeature "example.com/api/internal/features/chat"
@@ -31,7 +32,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	pool, err := db.Connect(ctx, cfg.DatabaseURL)
+	pool, err := db.ConnectWithRetry(ctx, cfg.DatabaseURL, 10*time.Second, time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,7 +83,7 @@ func setupRouter(a *app) *gin.Engine {
 	filesHandler := filesfeature.NewHandler(filesService)
 	requireUser := middleware.RequireUser(a.jwtSecret)
 
-	r.GET("/health", platformhandlers.HealthHandler)
+	r.GET("/health", platformhandlers.NewHealthHandler(a.dbPool))
 	authfeature.RegisterRoutes(r, authHandler, requireUser)
 	usersfeature.RegisterRoutes(r, usersHandler, requireUser)
 	chatfeature.RegisterRoutes(r, chatHandler, requireUser)

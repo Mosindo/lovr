@@ -9,24 +9,6 @@ on:
 jobs:
   qa-lite:
     runs-on: ubuntu-latest
-    env:
-      JWT_SECRET: ci-dev-only-change-this
-      DATABASE_URL: postgresql://app:app@localhost:5432/app?sslmode=disable
-      PORT: "18080"
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_USER: app
-          POSTGRES_PASSWORD: app
-          POSTGRES_DB: app
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U app -d app"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
 
     steps:
       - name: Checkout
@@ -43,34 +25,33 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: services/api/go.mod
+          cache: true
           cache-dependency-path: services/api/go.sum
 
       - name: Install mobile deps
         working-directory: apps/mobile
         run: npm ci
 
-      - name: Start API
+      - name: Start Docker stack
         shell: bash
-        run: |
-          nohup go run ./services/api/cmd/api >/tmp/boilerplate-api.log 2>&1 &
-          echo $! >/tmp/boilerplate-api.pid
+        run: docker compose up --build -d
 
       - name: Wait API health
         shell: bash
         run: |
           for i in {1..60}; do
-            if curl -fsS http://localhost:18080/health >/dev/null; then
+            if curl -fsS http://localhost:8080/health >/dev/null; then
               exit 0
             fi
             sleep 1
           done
           echo "API healthcheck timeout"
-          tail -n 200 /tmp/boilerplate-api.log || true
+          docker compose logs api || true
           exit 1
 
       - name: Run QA lite
         shell: pwsh
-        run: ./scripts/qa-lite.ps1 -ApiBaseUrl http://localhost:18080
+        run: ./scripts/qa-lite.ps1 -ApiBaseUrl http://localhost:8080
 
       - name: Upload QA reports
         if: always()
@@ -85,12 +66,9 @@ jobs:
       - name: API logs on failure
         if: failure()
         shell: bash
-        run: tail -n 200 /tmp/boilerplate-api.log || true
+        run: docker compose logs api || true
 
-      - name: Shutdown API
+      - name: Shutdown Docker stack
         if: always()
         shell: bash
-        run: |
-          if [ -f /tmp/boilerplate-api.pid ]; then
-            kill "$(cat /tmp/boilerplate-api.pid)" || true
-          fi
+        run: docker compose down -v
