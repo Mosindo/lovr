@@ -37,10 +37,29 @@ try {
   Run-Step "Smoke mobile e2e (parcours critique)" {
     Push-Location ".\apps\mobile"
     try {
+      $previousMobileApi = $env:MOBILE_E2E_API_URL
+      $previousExpoApi = $env:EXPO_PUBLIC_API_URL
+      $env:MOBILE_E2E_API_URL = $ApiBaseUrl
+      $env:EXPO_PUBLIC_API_URL = $ApiBaseUrl
+
       npm run e2e:smoke | Out-Host
       if ($LASTEXITCODE -ne 0) { throw "npm run e2e:smoke exited with code $LASTEXITCODE" }
     }
     finally {
+      if ($null -eq $previousMobileApi) {
+        Remove-Item Env:\MOBILE_E2E_API_URL -ErrorAction SilentlyContinue
+      }
+      else {
+        $env:MOBILE_E2E_API_URL = $previousMobileApi
+      }
+
+      if ($null -eq $previousExpoApi) {
+        Remove-Item Env:\EXPO_PUBLIC_API_URL -ErrorAction SilentlyContinue
+      }
+      else {
+        $env:EXPO_PUBLIC_API_URL = $previousExpoApi
+      }
+
       Pop-Location
     }
   }
