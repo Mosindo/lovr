@@ -3,19 +3,19 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, SafeAreaView, StyleSheet } from "react-native";
-import DiscoverScreen from "./src/screens/DiscoverScreen";
-import MatchesScreen from "./src/screens/MatchesScreen";
-import ChatsScreen from "./src/screens/ChatsScreen";
 import AuthScreen from "./src/screens/AuthScreen";
-import AccountScreen from "./src/screens/AccountScreen";
+import ChatScreen from "./src/screens/ChatScreen";
+import HomeScreen from "./src/screens/HomeScreen";
+import NotificationsScreen from "./src/screens/NotificationsScreen";
+import ProfileScreen from "./src/screens/ProfileScreen";
 import { me, type AuthUser } from "./src/api/auth";
-import { clearToken, getToken, saveToken } from "./src/auth/tokenStore";
+import { clearToken, getToken, saveToken } from "./src/store/tokenStore";
 
 export type RootTabParamList = {
-  Discover: undefined;
-  Matches: undefined;
-  Chats: undefined;
-  Account: undefined;
+  Home: undefined;
+  Chat: undefined;
+  Notifications: undefined;
+  Profile: undefined;
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
@@ -91,12 +91,18 @@ export default function App() {
   return (
     <NavigationContainer>
       <StatusBar style="auto" />
-      <Tab.Navigator>
-        <Tab.Screen name="Discover">{() => <DiscoverScreen token={token} />}</Tab.Screen>
-        <Tab.Screen name="Matches">{() => <MatchesScreen token={token} />}</Tab.Screen>
-        <Tab.Screen name="Chats">{() => <ChatsScreen currentUserId={user.id} token={token} />}</Tab.Screen>
-        <Tab.Screen name="Account">
-          {() => <AccountScreen onLogout={handleLogout} user={user} />}
+      <Tab.Navigator screenOptions={{ headerShown: false }}>
+        <Tab.Screen name="Home">
+          {() => <HomeScreen currentUserId={user.id} token={token} />}
+        </Tab.Screen>
+        <Tab.Screen name="Chat">
+          {() => <ChatScreen currentUserId={user.id} token={token} />}
+        </Tab.Screen>
+        <Tab.Screen name="Notifications">
+          {() => <NotificationsScreen token={token} />}
+        </Tab.Screen>
+        <Tab.Screen name="Profile">
+          {() => <ProfileScreen onLogout={handleLogout} token={token} user={user} />}
         </Tab.Screen>
       </Tab.Navigator>
     </NavigationContainer>

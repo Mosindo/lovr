@@ -1,8 +1,12 @@
 services/api/*.exe
+.cache/
 .expo/
+.expo-audit/
 node_modules/
 
 # Go binaries/build
+/bin/
+/build/
 *.exe
 *.dll
 *.so
@@ -18,12 +22,17 @@ build/
 
 # Environment files
 .env
+.env.local
 .env.*
 
 # IDE/editor files
 .vscode/
 .idea/
 *.iml
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Logs
 *.log

@@ -3,7 +3,7 @@ const API_BASE_URL = process.env.MOBILE_E2E_API_URL || process.env.EXPO_PUBLIC_A
 const PASSWORD = "Password123";
 
 function uniqueEmail(prefix) {
-  return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 100000)}@lovr.test`;
+  return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 100000)}@boilerplate.test`;
 }
 
 async function request(path, init = {}) {
@@ -57,29 +57,29 @@ async function main() {
   assert(login1.status === 200, `login failed: ${login1.status} ${JSON.stringify(login1.payload)}`);
   assert(login1.payload?.user?.id === auth1.user.id, "login user mismatch");
 
-  const discover1 = await request("/discover", {
+  const users = await request("/users", {
     method: "GET",
     headers: { Authorization: `Bearer ${auth1.token}` }
   });
-  assert(discover1.status === 200, `discover failed: ${discover1.status}`);
-  const seesUser2 = Array.isArray(discover1.payload?.users) && discover1.payload.users.some((u) => u.id === auth2.user.id);
-  assert(seesUser2, "discover should include second user before interactions");
+  assert(users.status === 200, `users failed: ${users.status}`);
+  const seesUser2 = Array.isArray(users.payload?.users) && users.payload.users.some((u) => u.id === auth2.user.id);
+  assert(seesUser2, "users list should include second user");
 
-  const like12 = await request("/likes", {
+  const createPost = await request("/posts", {
     method: "POST",
     headers: { Authorization: `Bearer ${auth1.token}` },
-    body: JSON.stringify({ toUserId: auth2.user.id })
+    body: JSON.stringify({ title: "Smoke post", body: "Validating the generic post feed." })
   });
-  assert(like12.status === 200, `like 1->2 failed: ${like12.status}`);
-  assert(like12.payload?.matched === false, "first like should not be matched");
+  assert(createPost.status === 201, `create post failed: ${createPost.status}`);
 
-  const like21 = await request("/likes", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${auth2.token}` },
-    body: JSON.stringify({ toUserId: auth1.user.id })
+  const listPosts = await request("/posts", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${auth1.token}` }
   });
-  assert(like21.status === 200, `like 2->1 failed: ${like21.status}`);
-  assert(like21.payload?.matched === true, "second like should produce match");
+  assert(listPosts.status === 200, `list posts failed: ${listPosts.status}`);
+  const seesNewPost =
+    Array.isArray(listPosts.payload?.posts) && listPosts.payload.posts.some((post) => post.id === createPost.payload?.id);
+  assert(seesNewPost, "posts list should include created post");
 
   const send = await request(`/chats/${auth2.user.id}/messages`, {
     method: "POST",
@@ -95,31 +95,35 @@ async function main() {
   assert(listMessages.status === 200, `list messages failed: ${listMessages.status}`);
   assert(Array.isArray(listMessages.payload?.messages) && listMessages.payload.messages.length > 0, "messages should not be empty");
 
-  const block = await request("/block", {
+  const createNotification = await request("/notifications", {
     method: "POST",
     headers: { Authorization: `Bearer ${auth1.token}` },
-    body: JSON.stringify({ toUserId: auth2.user.id })
+    body: JSON.stringify({
+      type: "system",
+      title: "Smoke notification",
+      body: "Validating the generic notification flow."
+    })
   });
-  assert(block.status === 200, `block failed: ${block.status}`);
-  assert(block.payload?.blocked === true, "block response should be blocked=true");
+  assert(createNotification.status === 201, `create notification failed: ${createNotification.status}`);
 
-  const likeAfterBlock = await request("/likes", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${auth2.token}` },
-    body: JSON.stringify({ toUserId: auth1.user.id })
-  });
-  assert(likeAfterBlock.status === 403, `like after block should be 403, got ${likeAfterBlock.status}`);
-
-  const discoverAfter = await request("/discover", {
+  const listNotifications = await request("/notifications", {
     method: "GET",
     headers: { Authorization: `Bearer ${auth1.token}` }
   });
-  assert(discoverAfter.status === 200, `discover after block failed: ${discoverAfter.status}`);
-  const stillSeesUser2 =
-    Array.isArray(discoverAfter.payload?.users) && discoverAfter.payload.users.some((u) => u.id === auth2.user.id);
-  assert(!stillSeesUser2, "blocked user should no longer appear in discover");
+  assert(listNotifications.status === 200, `list notifications failed: ${listNotifications.status}`);
+  const seesNotification =
+    Array.isArray(listNotifications.payload?.notifications) &&
+    listNotifications.payload.notifications.some((item) => item.id === createNotification.payload?.id);
+  assert(seesNotification, "notifications list should include created notification");
 
-  console.log("[e2e-smoke] PASS register/login/discover/like-match/chat/block");
+  const markRead = await request(`/notifications/${createNotification.payload.id}/read`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${auth1.token}` }
+  });
+  assert(markRead.status === 200, `mark notification read failed: ${markRead.status}`);
+  assert(markRead.payload?.isRead === true, "notification should be marked as read");
+
+  console.log("[e2e-smoke] PASS register/login/users/posts/chat/notifications");
 }
 
 main().catch((err) => {

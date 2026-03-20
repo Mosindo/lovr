@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/api/go.mod
+          cache: true
+          cache-dependency-path: services/api/go.sum
+
+      - name: Install Go dependencies
+        working-directory: services/api
+        run: go mod download
+
+      - name: Run Go tests
+        working-directory: services/api
+        run: go test ./...
+
+      - name: Run Go vet static checks
+        working-directory: services/api
+        run: go vet ./...
+
+      - name: Build the backend
+        working-directory: services/api
+        run: go build ./cmd/api
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.19.4
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: apps/mobile
+        run: npm ci
+
+      - name: Verify TypeScript
+        working-directory: apps/mobile
+        run: npx tsc --noEmit
+
+      - name: Build Docker image
+        run: docker build -t api-test ./services/api
+
+      - name: Verify Docker runtime (/health=200)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cleanup() {
+            docker rm -f api-test-run postgres-test >/dev/null 2>&1 || true
+            docker network rm api-test-network >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker network create api-test-network >/dev/null
+
+          echo "Starting Postgres for container health verification..."
+          docker run -d --name postgres-test \
+            --network api-test-network \
+            --network-alias postgres \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_DB=app \
+            postgres:15-alpine >/dev/null
+
+          echo "Waiting for Postgres readiness..."
+          for i in {1..30}; do
+            if docker exec postgres-test pg_isready -U postgres -d app >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          echo "Starting API container..."
+          docker run -d --name api-test-run \
+            --network api-test-network \
+            -p 18081:8080 \
+            -e DATABASE_URL="postgres://postgres:postgres@postgres:5432/app?sslmode=disable" \
+            -e JWT_SECRET="ci-dev-only-change-this" \
+            -e PORT="8080" \
+            api-test >/dev/null
+
+          echo "Waiting for /health=200..."
+          for i in {1..30}; do
+            code="$(curl -sS -o /dev/null -w '%{http_code}' http://localhost:18081/health || true)"
+            if [ "$code" = "200" ]; then
+              echo "Health OK."
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Container logs (api-test-run):"
+          docker logs api-test-run || true
+          exit 1

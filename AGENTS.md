@@ -1,181 +1,223 @@
-# AGENTS.md - Lovr
+# AGENTS.md - Fullstack Boilerplate
 
-Lovr est une application de rencontre "human-first".
-L'architecture doit rester scalable, securisee et maintenable long terme.
-
----
-
-# OBJECTIF PRODUIT
-
-- Swipe simple
-- Matching par centres d'interet
-- Chat uniquement apres match
-- Blocage atomique
-- Architecture compatible forte charge
+This repository is a reusable fullstack boilerplate.
+The architecture must remain scalable, secure, maintainable, and easy to evolve across product types.
 
 ---
 
-# STACK OFFICIELLE
+# PRODUCT GOAL
 
-## Mobile
-- React Native (Expo)
+This boilerplate must support building:
+- social networks
+- forums
+- SaaS products
+- marketplaces
+- community apps
+
+Keep the repository domain-agnostic by default.
+Avoid hardcoding product language tied to a single vertical unless explicitly requested.
+
+Core reusable modules:
+- auth
+- users
+- posts
+- comments
+- chat
+- notifications
+- files
+
+---
+
+# OFFICIAL STACK
+
+## Frontend
+- React / React Native (Expo)
 - TypeScript
-- Navigation simple
-- API REST
+- Simple navigation / routing
+- REST API
 
 ## API
 - Go
-- Framework: Gin
-- DB: Postgres
-- Driver: pgxpool
-- Auth: JWT (HS256)
-- Pas d'ORM
-- Pas de magie implicite
+- Gin
+- PostgreSQL
+- pgxpool
+- JWT (HS256)
+- No ORM
+- No implicit magic
+
+## Infra
+- Docker
+- Docker Compose
 
 ---
 
-# ARCHITECTURE BACKEND
+# BACKEND ARCHITECTURE
 
-Structure cible:
+Target structure:
 
 `cmd/api/main.go`  
 `internal/`
-- `auth/`
-- `handlers/`
-- `db/`
-- `middleware/`
-- `models/`
+- `platform/`
+  - `config/`
+  - `db/`
+  - `middleware/`
+  - `logger/`
+  - `errors/`
+- `features/`
+  - `auth/`
+  - `users/`
+  - `files/`
+  - `chat/`
+  - `posts/`
+  - `comments/`
+  - `notifications/`
 
-Regles:
-- Aucun melange `net/http` + Gin
-- Un seul serveur HTTP
-- Handlers fins
-- Logique metier hors handlers
-- Pas de logique SQL dans handlers
+Each feature should contain:
+- `handler.go`
+- `service.go`
+- `repository.go`
+- `model.go`
+- `routes.go`
+
+Rules:
+- No mixing `net/http` and Gin
+- Only one HTTP server
+- Thin handlers
+- Business logic outside handlers
+- No SQL in handlers
+- Shared concerns belong in `platform`
+- Domain concerns belong in `features`
 
 ---
 
-# SECURITE OBLIGATOIRE
+# SECURITY REQUIREMENTS
 
 JWT:
 - SigningMethodHMAC
 - Alg() == HS256
-- Expiration obligatoire
-- Validation stricte des claims
+- Expiration is mandatory
+- Strict claim validation
 
 Passwords:
 - bcrypt
-- Aucun stockage en clair
+- Never store passwords in plain text
 
-Entrees utilisateur:
-- Validation stricte
-- Trim + normalisation email
+User input:
+- Strict validation
+- Trim and normalize email
+- Validate pagination, filters, and sort inputs
+- Validate file metadata and upload constraints
 
 Secrets:
-- Jamais en dur
-- Variables attendues:
+- Never hardcode secrets
+- Expected environment variables:
   - `DATABASE_URL`
   - `JWT_SECRET`
-  - `PORT` (default 8080)
+  - `PORT` (default `8080`)
 
 ---
 
 # PERFORMANCE
 
-- Connexion DB via pool unique
-- Pas de connexion DB par requete
-- Pas de requetes N+1
-- Index requis sur:
-  - `users.email`
-  - `likes (from_user_id, to_user_id)`
-  - `blocks (blocker_user_id, blocked_user_id)`
+- Use a single shared DB pool
+- No DB connection per request
+- No N+1 queries
+- Prefer explicit pagination on list endpoints
+- Keep common API paths O(n) over page size
 
-Complexite attendue:
-- Matching O(n)
-- Pas de O(n^2)
+Required indexes:
+- `users.email`
+- `posts (author_id, created_at)`
+- `comments (post_id, created_at)`
+- `conversation_participants (conversation_id, user_id)`
+- `messages (conversation_id, created_at)`
+- `notifications (user_id, created_at)`
+- `files (owner_user_id, created_at)`
 
 ---
 
 # TESTS
 
-Avant toute livraison backend:
+Before any backend delivery:
 
 - `gofmt ./...`
 - `go test ./...`
 - `go build ./cmd/api`
 
-Si tests cassent: corriger avant toute suite.
+If tests fail: fix them before continuing.
 
-Tests integration a maintenir:
+Integration tests to keep healthy:
 - Health (`/health`)
 - Auth (`/auth/register`, `/auth/login`, `/me`)
-- Discover (`/discover`)
-- Likes (`/likes`)
-- Matches (`/matches`)
-- Block (`/block`) incluant effets atomiques
+- Users (`/users`)
+- Posts (`/posts`)
+- Chat (`/chats`, `/chats/:userId/messages`)
+- Notifications (`/notifications`)
 
 ---
 
-# RESEAU ET MOBILE (ANTI-RECURRENCE)
+# NETWORK AND MOBILE
 
-Regles obligatoires pour eviter les incidents observes:
+Mandatory rules to avoid recurring environment issues:
 
-- Ne jamais utiliser `localhost` pour les tests sur telephone physique.
-- Utiliser `EXPO_PUBLIC_API_URL=http://<LAN_IP>:<PORT_HOST_API>`.
-- Verifier qu'aucun service local (Apache/IIS/WSL) ne capte le port API avant annonce "ready":
+- Never use `localhost` for tests on a physical phone.
+- Use `EXPO_PUBLIC_API_URL=http://<LAN_IP>:<PORT_HOST_API>`.
+- Verify no local service is hijacking the API port before calling the app "ready":
   - `docker compose ps`
   - `netstat -ano | findstr :<PORT_HOST_API>`
   - `curl http://<LAN_IP>:<PORT_HOST_API>/health`
-- Si conflit detecte, changer le port host Docker (ex: `18080:8080`) et aligner:
+- If a conflict is detected, change the Docker host port (example: `18080:8080`) and align:
   - `infra/docker-compose.yml`
-  - fallback mobile API
-  - script de demarrage mobile
+  - mobile API fallback
+  - startup scripts
   - README
-- L'annonce "frontend pret" n'est valide qu'apres smoke test reel:
+- A frontend is only "ready" after a real smoke test:
   - register
   - login
-  - discover load
-  - like -> match
-  - block (depuis discover ou matches)
-  - verification post-block (plus visible, plus match, likes refuses)
+  - users load
+  - posts load
+  - chat send/read
+  - notifications read flow
 
 ---
 
-# REGLES D'EXECUTION POUR L'AGENT
+# AGENT EXECUTION RULES
 
-1. Toujours proposer un plan (5-10 etapes).
-2. Attendre validation.
-3. Appliquer via patch incremental.
-4. Ne jamais overwrite complet d'un fichier sans validation explicite.
-5. Fournir:
-   - diff complet
-   - fichiers modifies complets (si demande)
-   - sorties build/test
-   - nouvelles dependances
-6. - Aucune nouvelle fonctionnalité ne doit être ajoutée tant que les tâches marquées comme prioritaires dans PROJECT_STATUS.md ne sont pas terminées et validées.
+1. Propose a plan before substantial work.
+2. Wait for validation when the task has non-obvious tradeoffs.
+3. Apply changes through incremental patches.
+4. Do not overwrite a full file without explicit validation when a targeted patch is possible.
+5. Provide:
+   - full diff
+   - full modified files if requested
+   - build/test outputs
+   - new dependencies
+6. No new feature should be added while higher-priority agreed tasks remain unvalidated.
+
 ---
 
-# INTERDIT
+# FORBIDDEN
 
-- Refactor massif sans demande
-- Nouvelle dependance non justifiee
-- Suppression de fichiers sans validation
-- Changement d'architecture implicite
-- Melange `net/http` et Gin
+- Massive refactor without request
+- Unjustified new dependency
+- File deletion without validation
+- Implicit architecture change
+- Mixing `net/http` and Gin
+- Reintroducing product-specific naming into shared modules without approval
 
 ---
 
 # DEFINITION OF DONE
 
-Une tache est consideree terminee uniquement si:
-- code compile
-- tests passent
-- scenario fonctionnel critique est verifie
-- doc d'execution est coherente avec l'etat reel du projet
+A task is complete only if:
+- code compiles
+- tests pass
+- critical scenario is verified
+- runtime documentation reflects the actual repository state
 
 ---
 
-# ROLE DE L'AGENT
+# AGENT ROLE
 
-L'agent est un ingenieur executant.
-Les decisions d'architecture appartiennent au fondateur.
+The agent is an execution engineer.
+Architecture and product decisions belong to the founder.

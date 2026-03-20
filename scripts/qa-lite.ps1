@@ -8,10 +8,17 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $reportDir = Join-Path $repoRoot ".smoke"
 $reportPath = Join-Path $reportDir "qa-lite-report.txt"
+$goCacheDir = Join-Path $repoRoot ".cache\\go-build"
 
 if (-not (Test-Path $reportDir)) {
   New-Item -ItemType Directory -Path $reportDir -Force | Out-Null
 }
+
+if (-not (Test-Path $goCacheDir)) {
+  New-Item -ItemType Directory -Path $goCacheDir -Force | Out-Null
+}
+
+$env:GOCACHE = $goCacheDir
 
 $results = New-Object System.Collections.Generic.List[string]
 $failed = $false
@@ -32,7 +39,11 @@ try {
   Run-Step "Backend gofmt" {
     Push-Location ".\services\api"
     try {
-      Get-ChildItem -Recurse -Filter *.go | ForEach-Object { gofmt -w $_.FullName }
+      $unformatted = @(Get-ChildItem -Recurse -Filter *.go | ForEach-Object { gofmt -l $_.FullName } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+      if ($LASTEXITCODE -ne 0) { throw "gofmt check failed with exit code $LASTEXITCODE" }
+      if ($unformatted.Count -gt 0) {
+        throw ("gofmt check failed. Unformatted files:`n{0}" -f ($unformatted -join [Environment]::NewLine))
+      }
     }
     finally {
       Pop-Location
@@ -83,7 +94,7 @@ finally {
 
 $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $header = @(
-  "Lovr QA Lite Report",
+  "Boilerplate QA Lite Report",
   "Generated: $stamp",
   "API Base URL: $ApiBaseUrl",
   ""

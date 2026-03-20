@@ -9,8 +9,6 @@ on:
 jobs:
   qa-lite:
     runs-on: ubuntu-latest
-    env:
-      JWT_SECRET: ci-dev-only-change-this
 
     steps:
       - name: Checkout
@@ -27,43 +25,50 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: services/api/go.mod
+          cache: true
           cache-dependency-path: services/api/go.sum
 
       - name: Install mobile deps
         working-directory: apps/mobile
         run: npm ci
 
-      - name: Start API + DB
-        run: docker compose -f infra/docker-compose.yml up --build -d
+      - name: Start Docker stack
+        shell: bash
+        run: docker compose up --build -d
 
       - name: Wait API health
         shell: bash
         run: |
-          for i in {1..30}; do
-            if curl -fsS http://localhost:18080/health >/dev/null; then
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8080/health >/dev/null; then
               exit 0
             fi
-            sleep 2
+            sleep 1
           done
           echo "API healthcheck timeout"
-          docker compose -f infra/docker-compose.yml logs api postgres || true
+          docker compose logs api || true
           exit 1
 
       - name: Run QA lite
         shell: pwsh
-        run: ./scripts/qa-lite.ps1 -ApiBaseUrl http://localhost:18080
+        run: ./scripts/qa-lite.ps1 -ApiBaseUrl http://localhost:8080
 
       - name: Upload QA reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qa-lite-reports
-          path: .smoke/*.txt
+          path: |
+            .smoke/qa-lite-report.txt
+            .smoke/report.txt
+          if-no-files-found: warn
 
-      - name: Compose logs on failure
+      - name: API logs on failure
         if: failure()
-        run: docker compose -f infra/docker-compose.yml logs api postgres
+        shell: bash
+        run: docker compose logs api || true
 
-      - name: Shutdown stack
+      - name: Shutdown Docker stack
         if: always()
-        run: docker compose -f infra/docker-compose.yml down -v
+        shell: bash
+        run: docker compose down -v
