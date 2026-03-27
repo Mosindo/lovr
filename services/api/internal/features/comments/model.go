@@ -25,5 +25,5 @@ type CommentsResponse struct {
 }
 
 type CreateCommentRequest struct {
-	Content string `json:"content" binding:"required"`
+	Content string `json:"content" binding:"required,max=4000"`
 }

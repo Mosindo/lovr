@@ -60,6 +60,15 @@ func (h *Handler) Create(c *gin.Context) {
 		case errors.Is(err, ErrBodyRequired):
 			status = http.StatusBadRequest
 			c.JSON(status, gin.H{"error": "notification body required"})
+		case errors.Is(err, ErrTypeTooLong):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "notification type too long"})
+		case errors.Is(err, ErrTitleTooLong):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "notification title too long"})
+		case errors.Is(err, ErrBodyTooLong):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "notification body too long"})
 		default:
 			c.JSON(status, gin.H{"error": "could not create notification"})
 		}

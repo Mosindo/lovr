@@ -24,6 +24,8 @@ build/
 .env
 .env.local
 .env.*
+!.env.example
+!**/.env.example
 
 # IDE/editor files
 .vscode/
@@ -50,3 +52,4 @@ docker-data/
 
 # Mobile e2e runtime artifacts
 apps/mobile/.e2e/
+

@@ -1,4 +1,4 @@
-name: go-react-saas
+name: go-react-boilerplate
 
 services:
   postgres:
@@ -22,7 +22,7 @@ services:
       context: ./services/api
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/app?sslmode=disable
-      JWT_SECRET: dev-secret-change-me
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET to a strong random value}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
@@ -35,3 +35,5 @@ services:
 
 volumes:
   postgres_data:
+
+

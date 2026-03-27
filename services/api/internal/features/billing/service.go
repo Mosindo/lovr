@@ -112,16 +112,16 @@ func (s *Service) Checkout(ctx context.Context, organizationID, userID string) (
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return CheckoutResponse{}, fmt.Errorf("%w: %v", ErrCheckoutSessionFailed, err)
+		return CheckoutResponse{}, fmt.Errorf("%w: request failed", ErrCheckoutSessionFailed)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return CheckoutResponse{}, fmt.Errorf("%w: %v", ErrCheckoutSessionFailed, err)
+		return CheckoutResponse{}, fmt.Errorf("%w: response unreadable", ErrCheckoutSessionFailed)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return CheckoutResponse{}, fmt.Errorf("%w: status=%d body=%s", ErrCheckoutSessionFailed, resp.StatusCode, strings.TrimSpace(string(body)))
+		return CheckoutResponse{}, fmt.Errorf("%w: status=%d", ErrCheckoutSessionFailed, resp.StatusCode)
 	}
 
 	var session stripeCheckoutSessionResponse
@@ -187,7 +187,7 @@ func (s *Service) ProcessWebhook(ctx context.Context, payload []byte, signatureH
 	if strings.TrimSpace(s.stripeWebhookSecret) == "" {
 		return false, ErrWebhookUnavailable
 	}
-	if err := verifyStripeSignature(payload, signatureHeader, s.stripeWebhookSecret, time.Now()); err != nil {
+	if err := verifyStripeSignature(payload, signatureHeader, s.stripeWebhookSecret, time.Now().UTC()); err != nil {
 		return false, err
 	}
 
@@ -283,16 +283,16 @@ func (s *Service) createStripeCustomer(ctx context.Context, email, organizationI
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrCheckoutSessionFailed, err)
+		return "", fmt.Errorf("%w: request failed", ErrCheckoutSessionFailed)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrCheckoutSessionFailed, err)
+		return "", fmt.Errorf("%w: response unreadable", ErrCheckoutSessionFailed)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("%w: status=%d body=%s", ErrCheckoutSessionFailed, resp.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("%w: status=%d", ErrCheckoutSessionFailed, resp.StatusCode)
 	}
 
 	var customer stripeCustomerResponse
@@ -333,7 +333,7 @@ func verifyStripeSignature(payload []byte, header, secret string, now time.Time)
 	if timestamp == 0 || len(signatures) == 0 {
 		return ErrInvalidWebhookSignature
 	}
-	if now.Sub(time.Unix(timestamp, 0)) > webhookTimestampSkew {
+	if absDuration(now.Sub(time.Unix(timestamp, 0).UTC())) > webhookTimestampSkew {
 		return ErrInvalidWebhookSignature
 	}
 
@@ -373,6 +373,13 @@ func unixPtr(value int64) *time.Time {
 	}
 	t := time.Unix(value, 0).UTC()
 	return &t
+}
+
+func absDuration(value time.Duration) time.Duration {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 type stubHTTPResponse struct {

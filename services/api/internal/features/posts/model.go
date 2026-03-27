@@ -25,6 +25,6 @@ type PostsResponse struct {
 }
 
 type CreatePostRequest struct {
-	Title string `json:"title" binding:"required"`
-	Body  string `json:"body" binding:"required"`
+	Title string `json:"title" binding:"required,max=160"`
+	Body  string `json:"body" binding:"required,max=10000"`
 }

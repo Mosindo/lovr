@@ -196,6 +196,15 @@ func TestProcessWebhookRejectsInvalidSignature(t *testing.T) {
 	}
 }
 
+func TestVerifyStripeSignatureRejectsFutureTimestampOutsideSkew(t *testing.T) {
+	payload := []byte(`{"id":"evt_future"}`)
+	now := time.Now().UTC()
+	signature := signTestPayload(payload, "whsec_test", now.Add(10*time.Minute))
+	if err := verifyStripeSignature(payload, signature, "whsec_test", now); !errors.Is(err, ErrInvalidWebhookSignature) {
+		t.Fatalf("expected ErrInvalidWebhookSignature for future timestamp, got %v", err)
+	}
+}
+
 func TestProcessWebhookUpdatesSubscription(t *testing.T) {
 	repo := &stubRepository{}
 	svc := NewService(repo, Config{StripeWebhookSecret: "whsec_test"})

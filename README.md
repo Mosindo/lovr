@@ -128,12 +128,16 @@ The current frontend shell is designed to be reused and extended rather than tie
 - Go 1.23+ with toolchain support
 - Docker Desktop or Docker Engine
 
-## 1. Start PostgreSQL and the API with Docker
+## 1. Prepare environment
+
+Copy .env.example to .env and provide a strong JWT_SECRET before starting the stack.
+
+## 2. Start PostgreSQL and the API with Docker
 
 PowerShell:
 
 ```powershell
-$env:JWT_SECRET='change-me-in-dev'
+$env:JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
 $env:APP_BASE_URL='http://localhost:18080'
 docker compose up --build -d
 ```
@@ -141,7 +145,7 @@ docker compose up --build -d
 Bash:
 
 ```bash
-export JWT_SECRET='change-me-in-dev'
+export JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
 export APP_BASE_URL='http://localhost:18080'
 docker compose up --build -d
 ```
@@ -162,14 +166,14 @@ Health check:
 curl http://localhost:18080/health
 ```
 
-## 2. Run the API directly
+## 3. Run the API directly
 
 PowerShell:
 
 ```powershell
 cd services/api
 $env:DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
-$env:JWT_SECRET='change-me-in-dev'
+$env:JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
 go run ./cmd/api
 ```
 
@@ -178,11 +182,11 @@ Bash:
 ```bash
 cd services/api
 export DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
-export JWT_SECRET='change-me-in-dev'
+export JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
 go run ./cmd/api
 ```
 
-## 3. Start the mobile app
+## 4. Start the mobile app
 
 ```bash
 cd apps/mobile
@@ -204,7 +208,7 @@ For physical devices, set:
 EXPO_PUBLIC_API_URL=http://<LAN_IP>:18080
 ```
 
-## 4. Run checks
+## 5. Run checks
 
 Backend:
 
@@ -282,3 +286,4 @@ Current SaaS-oriented backend foundations include:
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+

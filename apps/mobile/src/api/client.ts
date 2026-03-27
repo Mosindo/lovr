@@ -10,17 +10,21 @@ function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, "");
 }
 
+function developmentFallbackBaseUrl(): string {
+  return Platform.OS === "android" ? "http://10.0.2.2:18080" : "http://localhost:18080";
+}
+
 function resolveApiBaseUrl(): string {
   const explicitBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (explicitBaseUrl) {
     return normalizeBaseUrl(explicitBaseUrl);
   }
 
-  if (Platform.OS === "android") {
-    return "http://10.0.2.2:18080";
+  if (__DEV__) {
+    return developmentFallbackBaseUrl();
   }
 
-  return "http://localhost:18080";
+  return "";
 }
 
 export const API_BASE_URL = resolveApiBaseUrl();
@@ -37,7 +41,6 @@ export class ApiError extends Error {
   }
 }
 
-// Placeholder indirection for JWT injection.
 async function getToken(): Promise<string | null> {
   return getAccessToken();
 }
@@ -73,6 +76,10 @@ function formatNetworkHint(): string {
     return "Network error. Check your connection and API availability, then try again.";
   }
 
+  if (!__DEV__) {
+    return "API base URL is not configured for this build. Set EXPO_PUBLIC_API_URL and try again.";
+  }
+
   if (Platform.OS === "android") {
     return "Network error. Android emulators usually need 10.0.2.2, and physical devices need EXPO_PUBLIC_API_URL set to your LAN IP.";
   }
@@ -82,6 +89,16 @@ function formatNetworkHint(): string {
   }
 
   return "Network error. Check your connection and try again.";
+}
+
+function requireApiBaseUrl(): string {
+  if (API_BASE_URL) {
+    return API_BASE_URL;
+  }
+
+  const message = "API base URL is not configured. Set EXPO_PUBLIC_API_URL for this build.";
+  showGlobalError(message);
+  throw new Error(message);
 }
 
 export async function apiRequest<T = unknown>(path: string, options?: RequestInit): Promise<T> {
@@ -104,7 +121,7 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
     if (!headers.has("Content-Type") && shouldSetJsonContentType(options?.body)) {
       headers.set("Content-Type", "application/json");
     }
-    const response = await fetch(`${API_BASE_URL}${path}`, {
+    const response = await fetch(`${requireApiBaseUrl()}${path}`, {
       ...options,
       headers,
       signal: controller.signal
@@ -130,7 +147,6 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
       throw new ApiError(response.status, data, message);
     }
 
-    // Some endpoints could return empty bodies (204); keep it predictable.
     const text = await response.text();
     if (!text) {
       return undefined as T;

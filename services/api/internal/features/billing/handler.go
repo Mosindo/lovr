@@ -10,6 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const maxWebhookPayloadBytes = 1 << 20
+
 type Handler struct {
 	service *Service
 }
@@ -71,6 +73,7 @@ func (h *Handler) Subscription(c *gin.Context) {
 }
 
 func (h *Handler) Webhook(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxWebhookPayloadBytes)
 	payload, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		logger.LogHandlerError(c, "billing.webhook.read", http.StatusBadRequest, err)
@@ -122,7 +125,7 @@ func (h *Handler) SuccessPage(c *gin.Context) {
     <section>
       <h1>Subscription confirmed</h1>
       <p>Your Stripe Checkout flow completed successfully.</p>
-      <p>You can now return to <strong>go-react-saas</strong>. The app will refresh your billing status automatically.</p>
+      <p>You can now return to <strong>go-react-boilerplate</strong>. The app will refresh your billing status automatically.</p>
       <p>You can safely close this page after returning to the app.</p>
     </section>
   </main>
@@ -150,7 +153,7 @@ func (h *Handler) CancelPage(c *gin.Context) {
     <section>
       <h1>Checkout canceled</h1>
       <p>No charge was applied.</p>
-      <p>You can return to <strong>go-react-saas</strong> and restart the billing flow whenever you are ready.</p>
+      <p>You can return to <strong>go-react-boilerplate</strong> and restart the billing flow whenever you are ready.</p>
     </section>
   </main>
 </body>

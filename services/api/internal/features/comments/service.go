@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 )
 
 var (
-	ErrPostNotFound         = errors.New("post not found")
-	ErrCommentContentNeeded = errors.New("comment content required")
+	ErrPostNotFound          = errors.New("post not found")
+	ErrCommentContentNeeded  = errors.New("comment content required")
+	ErrCommentContentTooLong = errors.New("comment content too long")
 )
 
 type Service struct {
@@ -16,8 +18,9 @@ type Service struct {
 }
 
 const (
-	defaultCommentsLimit = 20
-	maxCommentsLimit     = 200
+	defaultCommentsLimit   = 20
+	maxCommentsLimit       = 200
+	maxCommentContentRunes = 4000
 )
 
 func NewService(repo Repository) *Service {
@@ -51,6 +54,9 @@ func (s *Service) Create(ctx context.Context, organizationID, postID, authorUser
 	normalizedContent := strings.TrimSpace(content)
 	if normalizedContent == "" {
 		return Comment{}, ErrCommentContentNeeded
+	}
+	if utf8.RuneCountInString(normalizedContent) > maxCommentContentRunes {
+		return Comment{}, ErrCommentContentTooLong
 	}
 
 	comment, err := s.repo.CreateComment(ctx, organizationID, postID, authorUserID, normalizedContent)

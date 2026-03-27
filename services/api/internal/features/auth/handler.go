@@ -39,6 +39,7 @@ func (h *Handler) Register(c *gin.Context) {
 	}
 
 	status := http.StatusCreated
+	c.Header("Cache-Control", "no-store")
 	c.JSON(status, AuthResponse{
 		Token:        tokens.AccessToken,
 		AccessToken:  tokens.AccessToken,
@@ -76,6 +77,7 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 
 	status := http.StatusOK
+	c.Header("Cache-Control", "no-store")
 	c.JSON(status, AuthResponse{
 		Token:        tokens.AccessToken,
 		AccessToken:  tokens.AccessToken,
@@ -116,6 +118,7 @@ func (h *Handler) Refresh(c *gin.Context) {
 	}
 
 	status := http.StatusOK
+	c.Header("Cache-Control", "no-store")
 	c.JSON(status, AuthResponse{
 		Token:        tokens.AccessToken,
 		AccessToken:  tokens.AccessToken,
@@ -151,6 +154,7 @@ func (h *Handler) Logout(c *gin.Context) {
 		return
 	}
 
+	c.Header("Cache-Control", "no-store")
 	c.Status(http.StatusNoContent)
 }
 
@@ -170,6 +174,7 @@ func (h *Handler) Me(c *gin.Context) {
 		return
 	}
 
+	c.Header("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, MeResponse{
 		ID:             user.ID,
 		Email:          user.Email,

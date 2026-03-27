@@ -63,6 +63,18 @@ func (h *Handler) Create(c *gin.Context) {
 		case errors.Is(err, ErrInvalidFileSize):
 			status = http.StatusBadRequest
 			c.JSON(status, gin.H{"error": "invalid file size"})
+		case errors.Is(err, ErrFilenameTooLong):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "filename too long"})
+		case errors.Is(err, ErrMimeTypeTooLong):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "mime type too long"})
+		case errors.Is(err, ErrStorageKeyTooLong):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "storage key too long"})
+		case errors.Is(err, ErrFileTooLarge):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "file too large"})
 		default:
 			c.JSON(status, gin.H{"error": "could not create file"})
 		}

@@ -9,6 +9,8 @@ on:
 jobs:
   qa-lite:
     runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ci-jwt-secret-32-chars-minimum-value
 
     steps:
       - name: Checkout
@@ -17,7 +19,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "20.19.4"
           cache: "npm"
           cache-dependency-path: apps/mobile/package-lock.json
 
@@ -72,3 +74,4 @@ jobs:
         if: always()
         shell: bash
         run: docker compose down -v
+
