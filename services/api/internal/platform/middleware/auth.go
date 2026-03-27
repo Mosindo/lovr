@@ -32,11 +32,6 @@ func RequireUser(secret []byte) gin.HandlerFunc {
 			return
 		}
 
-		if !token.Valid {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-			return
-		}
-
 		expiresAt, err := claims.GetExpirationTime()
 		if err != nil || expiresAt == nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

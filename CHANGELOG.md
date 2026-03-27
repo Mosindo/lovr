@@ -1,4 +1,4 @@
-# Changelog
+# go-react-saas Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -17,8 +17,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added a generic changelog for future platform releases.
 
 ### Changed
-- Converted the repository from a single-product application into a reusable fullstack boilerplate.
-- Repositioned the repository as a reusable fullstack boilerplate for social, forum, SaaS, marketplace, and community products.
+- Converted the repository from a single-product application into `go-react-saas`, a reusable fullstack boilerplate.
+- Repositioned the repository as `go-react-saas`, a reusable fullstack boilerplate for social, forum, SaaS, marketplace, and community products.
 - Updated project descriptions, examples, and documentation to use generic module language.
 - Aligned the documentation with the feature-first backend and generic frontend shell.
 

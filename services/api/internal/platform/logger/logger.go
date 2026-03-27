@@ -2,12 +2,25 @@ package logger
 
 import (
 	"log"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+var sensitiveValuePatterns = []struct {
+	re          *regexp.Regexp
+	replacement string
+}{
+	{regexp.MustCompile(`(?i)Bearer\s+[A-Za-z0-9\-\._~\+/]+=*`), "Bearer [REDACTED]"},
+	{regexp.MustCompile(`\bsk_(test|live)_[A-Za-z0-9]+\b`), "[REDACTED_STRIPE_SECRET_KEY]"},
+	{regexp.MustCompile(`\bpk_(test|live)_[A-Za-z0-9]+\b`), "[REDACTED_STRIPE_PUBLISHABLE_KEY]"},
+	{regexp.MustCompile(`\bwhsec_[A-Za-z0-9]+\b`), "[REDACTED_STRIPE_WEBHOOK_SECRET]"},
+	{regexp.MustCompile(`\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b`), "[REDACTED_JWT]"},
+	{regexp.MustCompile(`(?i)(refresh[_-]?token|password|secret|authorization)(["'=:\s]+)([^",\s]+)`), `${1}${2}[REDACTED]`},
+}
 
 func LogHandlerError(c *gin.Context, operation string, status int, err error) {
 	requestID := c.GetString("request_id")
@@ -76,6 +89,9 @@ func sanitizeLogValue(v string) string {
 	trimmed = strings.ReplaceAll(trimmed, `"`, `\"`)
 	trimmed = strings.ReplaceAll(trimmed, "\n", " ")
 	trimmed = strings.ReplaceAll(trimmed, "\r", " ")
+	for _, pattern := range sensitiveValuePatterns {
+		trimmed = pattern.re.ReplaceAllString(trimmed, pattern.replacement)
+	}
 	if len(trimmed) > 256 {
 		return trimmed[:256]
 	}

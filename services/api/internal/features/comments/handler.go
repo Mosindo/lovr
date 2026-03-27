@@ -88,6 +88,9 @@ func (h *Handler) Create(c *gin.Context) {
 		case errors.Is(err, ErrCommentContentNeeded):
 			status = http.StatusBadRequest
 			c.JSON(status, gin.H{"error": "comment content required"})
+		case errors.Is(err, ErrCommentContentTooLong):
+			status = http.StatusBadRequest
+			c.JSON(status, gin.H{"error": "comment content too long"})
 		default:
 			c.JSON(status, gin.H{"error": "could not create comment"})
 		}

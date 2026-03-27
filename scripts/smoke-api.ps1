@@ -10,7 +10,7 @@ $password = "Password123"
 function New-UniqueEmail([string]$prefix) {
   $stamp = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
   $rand = Get-Random -Maximum 100000
-  return "${prefix}_${stamp}_${rand}@boilerplate.test"
+  return "${prefix}_${stamp}_${rand}@go-react-saas.test"
 }
 
 function Invoke-Api([string]$Method, [string]$Path, [object]$Body = $null, [hashtable]$Headers = @{}) {

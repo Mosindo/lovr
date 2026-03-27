@@ -1,64 +1,70 @@
-import React from "react";
-import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import React, { useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, SafeAreaView, StyleSheet } from "react-native";
+import { StyleSheet, View } from "react-native";
 import AuthScreen from "./src/screens/AuthScreen";
-import ChatScreen from "./src/screens/ChatScreen";
-import HomeScreen from "./src/screens/HomeScreen";
-import NotificationsScreen from "./src/screens/NotificationsScreen";
-import ProfileScreen from "./src/screens/ProfileScreen";
 import { AuthProvider, useAuth } from "./src/hooks/useAuth";
-
-export type RootTabParamList = {
-  Home: undefined;
-  Chat: undefined;
-  Notifications: undefined;
-  Profile: undefined;
-};
-
-const Tab = createBottomTabNavigator<RootTabParamList>();
+import { BottomNavigation, SafeAreaLayout } from "./src/shared/layout";
+import { clearGlobalError, ErrorView, LoadingView, useGlobalFeedback } from "./src/shared/feedback";
+import { colors, spacing } from "./src/shared/ui";
 
 function AppShell() {
-  const { accessToken, authError, isAuthenticated, isBooting, user } = useAuth();
+  const { accessToken, isAuthenticated, isBooting, user } = useAuth();
+  const globalFeedback = useGlobalFeedback();
+
+  useEffect(() => {
+    if (!globalFeedback.error) {
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      clearGlobalError();
+    }, 5000);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [globalFeedback.error]);
 
   if (isBooting) {
     return (
-      <SafeAreaView style={styles.bootContainer}>
-        <StatusBar style="auto" />
-        <ActivityIndicator size="large" color="#111827" />
-      </SafeAreaView>
+      <SafeAreaLayout style={styles.bootContainer}>
+        <StatusBar style="dark" />
+        <LoadingView fullScreen label="Restoring session..." />
+      </SafeAreaLayout>
     );
   }
 
   if (!isAuthenticated || !accessToken || !user) {
     return (
       <>
-        <StatusBar style="auto" />
+        <StatusBar style="dark" />
         <AuthScreen />
-        {authError ? <SafeAreaView style={styles.authErrorWrap}><ActivityIndicator size="small" color="#111827" /></SafeAreaView> : null}
       </>
     );
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="auto" />
-      <Tab.Navigator screenOptions={{ headerShown: false }}>
-        <Tab.Screen name="Home">
-          {() => <HomeScreen currentUserId={user.id} token={accessToken} />}
-        </Tab.Screen>
-        <Tab.Screen name="Chat">
-          {() => <ChatScreen currentUserId={user.id} token={accessToken} />}
-        </Tab.Screen>
-        <Tab.Screen name="Notifications">
-          {() => <NotificationsScreen token={accessToken} />}
-        </Tab.Screen>
-        <Tab.Screen name="Profile">
-          {() => <ProfileScreen token={accessToken} user={user} />}
-        </Tab.Screen>
-      </Tab.Navigator>
-    </NavigationContainer>
+    <>
+      <StatusBar style="dark" />
+      <BottomNavigation accessToken={accessToken} key={user.id} user={user} />
+      {globalFeedback.error ? (
+        <View pointerEvents="box-none" style={styles.bannerWrap}>
+          <ErrorView
+            actionLabel="Dismiss"
+            compact
+            message={globalFeedback.error}
+            onAction={clearGlobalError}
+            style={styles.banner}
+            title="Request issue"
+          />
+        </View>
+      ) : null}
+      {globalFeedback.loadingCount > 0 && !isBooting ? (
+        <View style={styles.overlay}>
+          <LoadingView label={globalFeedback.loadingLabel ?? "Working..."} style={styles.overlayCard} />
+        </View>
+      ) : null}
+    </>
   );
 }
 
@@ -73,15 +79,28 @@ export default function App() {
 const styles = StyleSheet.create({
   bootContainer: {
     flex: 1,
+    backgroundColor: colors.background
+  },
+  bannerWrap: {
+    position: "absolute",
+    left: spacing.lg,
+    right: spacing.lg,
+    bottom: spacing.xxl
+  },
+  banner: {},
+  overlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: colors.overlay,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f9fafb"
+    paddingHorizontal: spacing.xxl
   },
-  authErrorWrap: {
-    position: "absolute",
-    bottom: 24,
-    left: 24,
-    right: 24,
-    alignItems: "center"
+  overlayCard: {
+    width: "100%",
+    maxWidth: 320
   }
 });

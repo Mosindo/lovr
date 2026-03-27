@@ -4,11 +4,14 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 )
 
 var (
 	ErrTitleRequired = errors.New("post title required")
 	ErrBodyRequired  = errors.New("post body required")
+	ErrTitleTooLong  = errors.New("post title too long")
+	ErrBodyTooLong   = errors.New("post body too long")
 )
 
 type Service struct {
@@ -18,6 +21,8 @@ type Service struct {
 const (
 	defaultPostsLimit = 20
 	maxPostsLimit     = 100
+	maxPostTitleRunes = 160
+	maxPostBodyRunes  = 10000
 )
 
 func NewService(repo Repository) *Service {
@@ -44,10 +49,16 @@ func (s *Service) Create(ctx context.Context, organizationID, authorUserID, titl
 	if normalizedTitle == "" {
 		return Post{}, ErrTitleRequired
 	}
+	if utf8.RuneCountInString(normalizedTitle) > maxPostTitleRunes {
+		return Post{}, ErrTitleTooLong
+	}
 
 	normalizedBody := strings.TrimSpace(body)
 	if normalizedBody == "" {
 		return Post{}, ErrBodyRequired
+	}
+	if utf8.RuneCountInString(normalizedBody) > maxPostBodyRunes {
+		return Post{}, ErrBodyTooLong
 	}
 
 	post, err := s.repo.CreatePost(ctx, organizationID, authorUserID, normalizedTitle, normalizedBody)

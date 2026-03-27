@@ -1,6 +1,6 @@
-# Fullstack Boilerplate
+# go-react-saas
 
-A reusable fullstack monorepo for building social networks, forums, SaaS products, marketplaces, and community apps with a shared Go API, PostgreSQL database, Docker-based infrastructure, and React / React Native clients.
+`go-react-saas` is a reusable fullstack monorepo for building social networks, forums, SaaS products, marketplaces, and community apps with a shared Go API, PostgreSQL database, Docker-based infrastructure, and React / React Native clients.
 
 ## Project Overview
 
@@ -14,6 +14,8 @@ This repository provides a production-minded starting point for fullstack produc
 - predictable smoke and QA scripts
 
 The codebase is intentionally generic. Core modules can be composed and extended without assuming a single business vertical.
+
+The default Docker Compose project name is `go-react-saas`, which keeps generated container, network, and volume names stable across environments.
 
 ## Stack Description
 
@@ -108,7 +110,9 @@ Within `apps/mobile/src`:
 - `api` contains REST clients
 - `hooks` contains React Query-powered auth/session hooks
 - `screens` contains route-level UI
-- `components/ui` contains reusable UI building blocks
+- `shared/ui` contains reusable UI primitives and tokens
+- `shared/layout` contains global layout and navigation shells
+- `shared/feedback` contains reusable loading, error, and empty states
 - `store` contains token/session persistence
 - `theme` contains shared design tokens
 - `utils` contains shared helpers
@@ -124,23 +128,37 @@ The current frontend shell is designed to be reused and extended rather than tie
 - Go 1.23+ with toolchain support
 - Docker Desktop or Docker Engine
 
-## 1. Start PostgreSQL and the API with Docker
+## 1. Prepare environment
+
+Copy .env.example to .env and provide a strong JWT_SECRET before starting the stack.
+
+## 2. Start PostgreSQL and the API with Docker
 
 PowerShell:
 
 ```powershell
-$env:JWT_SECRET='change-me-in-dev'
+$env:JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
+$env:APP_BASE_URL='http://localhost:18080'
 docker compose up --build -d
 ```
 
 Bash:
 
 ```bash
-export JWT_SECRET='change-me-in-dev'
+export JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
+export APP_BASE_URL='http://localhost:18080'
 docker compose up --build -d
 ```
 
 The API is exposed on `http://localhost:18080`.
+
+Optional Stripe billing variables:
+
+```powershell
+$env:STRIPE_SECRET_KEY='sk_test_...'
+$env:STRIPE_WEBHOOK_SECRET='whsec_...'
+$env:STRIPE_PRICE_ID='price_...'
+```
 
 Health check:
 
@@ -148,14 +166,14 @@ Health check:
 curl http://localhost:18080/health
 ```
 
-## 2. Run the API directly
+## 3. Run the API directly
 
 PowerShell:
 
 ```powershell
 cd services/api
 $env:DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
-$env:JWT_SECRET='change-me-in-dev'
+$env:JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
 go run ./cmd/api
 ```
 
@@ -164,11 +182,11 @@ Bash:
 ```bash
 cd services/api
 export DATABASE_URL='postgresql://app:app@localhost:5432/app?sslmode=disable'
-export JWT_SECRET='change-me-in-dev'
+export JWT_SECRET='replace-with-a-random-secret-at-least-32-characters-long'
 go run ./cmd/api
 ```
 
-## 3. Start the mobile app
+## 4. Start the mobile app
 
 ```bash
 cd apps/mobile
@@ -190,7 +208,7 @@ For physical devices, set:
 EXPO_PUBLIC_API_URL=http://<LAN_IP>:18080
 ```
 
-## 4. Run checks
+## 5. Run checks
 
 Backend:
 
@@ -214,6 +232,28 @@ Repository-wide QA:
 powershell -ExecutionPolicy Bypass -File .\scripts\qa-lite.ps1 -ApiBaseUrl http://localhost:18080
 ```
 
+## Stripe Billing And MCP
+
+Backend billing is already wired for:
+- `POST /billing/checkout`
+- `GET /billing/subscription`
+- `POST /billing/webhook`
+
+Required environment variables for a live Stripe flow:
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_ID`
+- `APP_BASE_URL`
+
+`APP_BASE_URL` should be the public URL that Stripe redirects back to after checkout. In local Docker runs, `http://localhost:18080` is fine for backend verification. For device testing or hosted environments, use a reachable public or LAN URL instead.
+
+Codex MCP Stripe reference config is stored in [config.toml](.codex/config.toml). The shared Codex config on this machine now also includes:
+
+```toml
+[mcp_servers.stripe]
+url = "https://mcp.stripe.com"
+```
+
 ## How To Add New Features
 
 Use the existing vertical-slice pattern and keep naming generic.
@@ -235,9 +275,10 @@ Current SaaS-oriented backend foundations include:
 ### Frontend
 1. Add API client functions in `apps/mobile/src/api`.
 2. Add or extend screens in `apps/mobile/src/screens`.
-3. Extract reusable UI into `apps/mobile/src/components/ui`.
-4. Keep tokens and storage concerns centralized in `theme` and `store`.
-5. Re-run TypeScript and smoke checks after changes.
+3. Extract reusable UI into `apps/mobile/src/shared/ui`.
+4. Keep layout concerns in `shared/layout` and stateful feedback in `shared/feedback`.
+5. Keep tokens and storage concerns centralized in `theme` and `store`.
+6. Re-run TypeScript and smoke checks after changes.
 
 ## Additional Documentation
 
@@ -245,3 +286,4 @@ Current SaaS-oriented backend foundations include:
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - [CHANGELOG.md](CHANGELOG.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+

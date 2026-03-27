@@ -29,7 +29,7 @@ type NotificationsResponse struct {
 }
 
 type CreateNotificationRequest struct {
-	Type  string `json:"type" binding:"required"`
-	Title string `json:"title" binding:"required"`
-	Body  string `json:"body" binding:"required"`
+	Type  string `json:"type" binding:"required,max=64"`
+	Title string `json:"title" binding:"required,max=160"`
+	Body  string `json:"body" binding:"required,max=1000"`
 }

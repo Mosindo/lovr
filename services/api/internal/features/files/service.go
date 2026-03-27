@@ -4,13 +4,18 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"unicode/utf8"
 )
 
 var (
-	ErrFilenameRequired = errors.New("filename required")
-	ErrMimeTypeRequired = errors.New("mime type required")
-	ErrStorageKeyNeeded = errors.New("storage key required")
-	ErrInvalidFileSize  = errors.New("invalid file size")
+	ErrFilenameRequired  = errors.New("filename required")
+	ErrMimeTypeRequired  = errors.New("mime type required")
+	ErrStorageKeyNeeded  = errors.New("storage key required")
+	ErrInvalidFileSize   = errors.New("invalid file size")
+	ErrFilenameTooLong   = errors.New("filename too long")
+	ErrMimeTypeTooLong   = errors.New("mime type too long")
+	ErrStorageKeyTooLong = errors.New("storage key too long")
+	ErrFileTooLarge      = errors.New("file too large")
 )
 
 type Service struct {
@@ -18,8 +23,12 @@ type Service struct {
 }
 
 const (
-	defaultFilesLimit = 20
-	maxFilesLimit     = 100
+	defaultFilesLimit  = 20
+	maxFilesLimit      = 100
+	maxFilenameRunes   = 255
+	maxMimeTypeRunes   = 255
+	maxStorageKeyRunes = 512
+	maxFileSizeBytes   = 100 * 1024 * 1024
 )
 
 func NewService(repo Repository) *Service {
@@ -46,16 +55,28 @@ func (s *Service) Create(ctx context.Context, ownerUserID, filename, mimeType st
 	if normalizedFilename == "" {
 		return File{}, ErrFilenameRequired
 	}
+	if utf8.RuneCountInString(normalizedFilename) > maxFilenameRunes {
+		return File{}, ErrFilenameTooLong
+	}
 	normalizedMimeType := strings.TrimSpace(mimeType)
 	if normalizedMimeType == "" {
 		return File{}, ErrMimeTypeRequired
 	}
+	if utf8.RuneCountInString(normalizedMimeType) > maxMimeTypeRunes {
+		return File{}, ErrMimeTypeTooLong
+	}
 	if sizeBytes < 0 {
 		return File{}, ErrInvalidFileSize
+	}
+	if sizeBytes > maxFileSizeBytes {
+		return File{}, ErrFileTooLarge
 	}
 	normalizedStorageKey := strings.TrimSpace(storageKey)
 	if normalizedStorageKey == "" {
 		return File{}, ErrStorageKeyNeeded
+	}
+	if utf8.RuneCountInString(normalizedStorageKey) > maxStorageKeyRunes {
+		return File{}, ErrStorageKeyTooLong
 	}
 
 	file, err := s.repo.CreateFile(ctx, ownerUserID, normalizedFilename, normalizedMimeType, sizeBytes, normalizedStorageKey)

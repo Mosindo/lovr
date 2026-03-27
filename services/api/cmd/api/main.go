@@ -29,6 +29,7 @@ type app struct {
 	stripeWebhookSecret string
 	stripePriceID       string
 	appBaseURL          string
+	allowedOrigins      []string
 }
 
 func main() {
@@ -55,6 +56,7 @@ func main() {
 		stripeWebhookSecret: cfg.StripeWebhookSecret,
 		stripePriceID:       cfg.StripePriceID,
 		appBaseURL:          cfg.AppBaseURL,
+		allowedOrigins:      cfg.AllowedOrigins,
 	}
 
 	r := setupRouter(a)
@@ -69,6 +71,8 @@ func main() {
 func setupRouter(a *app) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(middleware.SecurityHeaders())
+	r.Use(middleware.CORS(a.allowedOrigins))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.RequestStart())
 	r.Use(middleware.RequestMetrics())

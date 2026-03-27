@@ -17,6 +17,11 @@ import {
   type AuthSession,
   type AuthUser
 } from "../api/auth";
+import {
+  beginGlobalLoading,
+  clearGlobalError,
+  endGlobalLoading
+} from "../shared/feedback";
 import { clearTokens, getTokens, saveTokens, type AuthTokens } from "../store/tokenStore";
 
 type AuthCredentials = {
@@ -34,6 +39,7 @@ type AuthContextValue = {
   authError: string | null;
   currentUserQuery: UseQueryResult<AuthUser, Error>;
   applySession: (session: AuthSession) => Promise<void>;
+  clearAuthError: () => void;
   logout: () => Promise<void>;
 };
 
@@ -96,11 +102,16 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       await saveTokens(toStoredTokens(session));
       setTokens(toStoredTokens(session));
       setAuthError(null);
+      clearGlobalError();
       setRefreshAttemptedFor(null);
       queryClientInstance.setQueryData([...CURRENT_USER_QUERY_KEY, session.accessToken], session.user);
     },
     [queryClientInstance]
   );
+
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
 
   const refreshCurrentSession = useCallback(async () => {
     if (!tokens?.refreshToken) {
@@ -108,6 +119,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       return false;
     }
 
+    beginGlobalLoading("Refreshing session...");
     try {
       const nextSession = await refreshSessionRequest(tokens.refreshToken);
       await applySession(nextSession);
@@ -116,11 +128,14 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       await clearSession();
       setAuthError(formatAuthError(error, "Your session expired. Please login again."));
       return false;
+    } finally {
+      endGlobalLoading();
     }
   }, [applySession, clearSession, tokens?.refreshToken]);
 
   const logout = useCallback(async () => {
     setIsLoggingOut(true);
+    beginGlobalLoading("Signing out...");
     try {
       if (tokens?.refreshToken) {
         await logoutRequest(tokens.refreshToken);
@@ -130,6 +145,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     } finally {
       await clearSession();
       setIsLoggingOut(false);
+      endGlobalLoading();
     }
   }, [clearSession, tokens?.refreshToken]);
 
@@ -195,9 +211,10 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       authError,
       currentUserQuery,
       applySession,
+      clearAuthError,
       logout
     }),
-    [applySession, authError, bootstrapping, currentUserQuery, isLoggingOut, logout, tokens]
+    [applySession, authError, bootstrapping, clearAuthError, currentUserQuery, isLoggingOut, logout, tokens]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -224,10 +241,18 @@ export function useCurrentUser(): UseQueryResult<AuthUser, Error> {
 }
 
 export function useLogin(): UseMutationResult<AuthSession, Error, AuthCredentials> {
-  const { applySession } = useAuth();
+  const { applySession, clearAuthError } = useAuth();
 
   return useMutation<AuthSession, Error, AuthCredentials>({
-    mutationFn: ({ email, password }) => loginRequest(email, password),
+    mutationFn: async ({ email, password }) => {
+      clearAuthError();
+      beginGlobalLoading("Signing in...");
+      try {
+        return await loginRequest(email, password);
+      } finally {
+        endGlobalLoading();
+      }
+    },
     onSuccess: async (session) => {
       await applySession(session);
     }
@@ -235,10 +260,18 @@ export function useLogin(): UseMutationResult<AuthSession, Error, AuthCredential
 }
 
 export function useRegister(): UseMutationResult<AuthSession, Error, AuthCredentials> {
-  const { applySession } = useAuth();
+  const { applySession, clearAuthError } = useAuth();
 
   return useMutation<AuthSession, Error, AuthCredentials>({
-    mutationFn: ({ email, password }) => registerRequest(email, password),
+    mutationFn: async ({ email, password }) => {
+      clearAuthError();
+      beginGlobalLoading("Creating account...");
+      try {
+        return await registerRequest(email, password);
+      } finally {
+        endGlobalLoading();
+      }
+    },
     onSuccess: async (session) => {
       await applySession(session);
     }

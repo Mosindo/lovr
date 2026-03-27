@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for contributing to this fullstack boilerplate.
+Thanks for contributing to `go-react-saas`.
 
 ## Ground Rules
 

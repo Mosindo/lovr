@@ -1,15 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View
 } from "react-native";
 import {
@@ -21,6 +17,9 @@ import {
   type ChatSummary,
   type PlatformUser
 } from "../api/platform";
+import { EmptyView, ErrorView, LoadingView } from "../shared/feedback";
+import { Header, ScreenContainer, Section } from "../shared/layout";
+import { Avatar, Button, Card, Input, ListItem, MessageItem, Notice, Text, colors, radii, spacing } from "../shared/ui";
 
 type ChatScreenProps = {
   token: string;
@@ -235,312 +234,182 @@ export default function ChatScreen({ token, currentUserId }: ChatScreenProps) {
   );
 
   const title = useMemo(() => (selectedChat ? selectedChat.user.email : "Chat"), [selectedChat]);
+  const subtitle = selectedChat ? "Direct conversation" : "Conversations and team directory";
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header} testID="chat-screen">
-        {selectedChat ? (
-          <Pressable
-            onPress={() => {
-              setSelectedChat(null);
-              setMessages([]);
-              setDraft("");
-              setError(null);
-              setBackgroundError(null);
-            }}
-            testID="chat-back-button"
-          >
-            <Text style={styles.back}>Back</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.backPlaceholder} />
-        )}
-
-        <Text style={styles.title}>{title}</Text>
-
-        <Pressable disabled={loading || sending} onPress={reloadCurrentView} testID="chat-reload-button">
-          <Text style={[styles.reload, loading || sending ? styles.disabledAction : null]}>Reload</Text>
-        </Pressable>
-      </View>
+    <ScreenContainer testID="chat-screen">
+      <Header
+        action={
+          <Button
+            disabled={loading || sending}
+            label="Reload"
+            onPress={reloadCurrentView}
+            size="sm"
+            testID="chat-reload-button"
+            variant="outline"
+          />
+        }
+        eyebrow="Inbox"
+        leading={
+          selectedChat ? (
+            <Button
+              label="Back"
+              onPress={() => {
+                setSelectedChat(null);
+                setMessages([]);
+                setDraft("");
+                setError(null);
+                setBackgroundError(null);
+              }}
+              size="sm"
+              testID="chat-back-button"
+              variant="ghost"
+            />
+          ) : null
+        }
+        style={styles.headerShell}
+        subtitle={subtitle}
+        title={title}
+      />
 
       {error ? (
-        <View style={styles.errorWrap}>
-          <Text style={styles.error}>{error}</Text>
-          <Pressable disabled={loading || sending} onPress={reloadCurrentView}>
-            <Text style={[styles.retry, loading || sending ? styles.disabledAction : null]}>Retry</Text>
-          </Pressable>
-        </View>
+        <ErrorView actionLabel="Retry" compact message={error} onAction={() => void reloadCurrentView()} style={styles.errorWrap} />
       ) : null}
 
       {!error && backgroundError ? (
-        <View style={styles.warnWrap}>
-          <Text style={styles.warn}>{backgroundError}</Text>
-          <Pressable disabled={loading || sending} onPress={reloadCurrentView}>
-            <Text style={[styles.retry, loading || sending ? styles.disabledAction : null]}>Reload</Text>
-          </Pressable>
-        </View>
+        <Notice
+          description="The chat UI is still usable, but the latest background refresh did not complete."
+          style={styles.warnWrap}
+          title={backgroundError}
+          tone="warning"
+        />
       ) : null}
 
       {loading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color="#1d4ed8" />
-          <Text style={styles.loadingText}>
-            {selectedChat ? "Loading conversation..." : "Loading chat workspace..."}
-          </Text>
-        </View>
+        <LoadingView
+          fullScreen
+          label={selectedChat ? "Loading conversation..." : "Loading chat workspace..."}
+          style={styles.loaderWrap}
+        />
       ) : selectedChat ? (
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.chatWrap}>
           <FlatList
             contentContainerStyle={styles.messageList}
             data={messages}
             keyExtractor={(item) => item.id}
-            ListEmptyComponent={<Text style={styles.empty}>No messages yet. Start the conversation.</Text>}
+            ListEmptyComponent={
+              <EmptyView
+                message="Start with a quick hello to open the conversation."
+                title="No messages yet"
+              />
+            }
             renderItem={({ item }) => {
               const mine = item.senderUserId === currentUserId;
-              return (
-                <View style={[styles.messageBubble, mine ? styles.mine : styles.theirs]}>
-                  <Text style={mine ? styles.mineText : styles.theirsText}>{item.content}</Text>
-                </View>
-              );
+              return <MessageItem content={item.content} mine={mine} />;
             }}
           />
 
           <View style={styles.composer}>
-            <TextInput
+            <Input
+              containerStyle={styles.inputWrap}
               onChangeText={setDraft}
               placeholder="Write a message..."
               style={styles.input}
               testID="chat-message-input"
               value={draft}
             />
-            <Pressable
-              disabled={sending || loading}
+            <Button
+              disabled={loading}
+              label="Send"
+              loading={sending}
               onPress={onSend}
-              style={[styles.sendButton, sending || loading ? styles.sendButtonDisabled : null]}
+              size="sm"
               testID="chat-send-button"
-            >
-              <Text style={styles.sendText}>{sending ? "..." : "Send"}</Text>
-            </Pressable>
+            />
           </View>
         </KeyboardAvoidingView>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.section}>
-            <Text style={styles.sectionEyebrow}>Inbox</Text>
-            <Text style={styles.sectionTitle}>Recent conversations</Text>
-            {chatList.length === 0 ? <Text style={styles.empty}>No conversations yet.</Text> : null}
+          <Section eyebrow="Inbox" title="Recent conversations">
+            {chatList.length === 0 ? (
+              <EmptyView message="New conversations will appear here as soon as you start messaging." title="No conversations yet" />
+            ) : null}
             {chatList.map((chat) => (
-              <Pressable
+              <ListItem
                 key={chat.user.id}
                 disabled={loading || sending}
+                leading={<Avatar name={chat.user.email} size={40} />}
                 onPress={() => void openChat(chatSummaryToTarget(chat))}
-                style={[styles.chatCard, loading || sending ? styles.chatCardDisabled : null]}
+                style={loading || sending ? styles.chatCardDisabled : null}
+                subtitle={chat.lastMessage?.content ?? "Open conversation"}
                 testID={`chat-open-${chat.user.id}`}
-              >
-                <Text style={styles.chatEmail}>{chat.user.email}</Text>
-                <Text style={styles.chatPreview}>{chat.lastMessage?.content ?? "Open conversation"}</Text>
-              </Pressable>
+                title={chat.user.email}
+              />
             ))}
-          </View>
+          </Section>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionEyebrow}>Directory</Text>
-            <Text style={styles.sectionTitle}>Start a new conversation</Text>
-            {availableContacts.length === 0 ? <Text style={styles.empty}>No additional members available.</Text> : null}
+          <Section eyebrow="Directory" title="Start a new conversation">
+            {availableContacts.length === 0 ? (
+              <EmptyView message="Invite more teammates to unlock new conversations." title="No additional members available" />
+            ) : null}
             {availableContacts.map((user) => (
-              <Pressable
+              <ListItem
                 key={user.id}
                 disabled={loading || sending}
+                leading={<Avatar name={user.email} size={40} />}
                 onPress={() => void openChat({ user })}
-                style={[styles.contactCard, loading || sending ? styles.chatCardDisabled : null]}
-              >
-                <Text style={styles.chatEmail}>{user.email}</Text>
-                <Text style={styles.chatPreview}>Message this member</Text>
-              </Pressable>
+                style={loading || sending ? styles.chatCardDisabled : null}
+                subtitle="Message this member"
+                title={user.email}
+                variant="muted"
+              />
             ))}
-          </View>
+          </Section>
         </ScrollView>
       )}
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#eef6ff",
-    paddingHorizontal: 16,
-    paddingTop: 8
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12
-  },
-  back: {
-    color: "#2563eb",
-    fontWeight: "700",
-    width: 52
-  },
-  backPlaceholder: {
-    width: 52
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "800",
-    flex: 1,
-    textAlign: "center",
-    color: "#0f172a"
-  },
-  reload: {
-    color: "#2563eb",
-    fontWeight: "700",
-    width: 52,
-    textAlign: "right"
-  },
-  disabledAction: {
-    color: "#93c5fd"
+  headerShell: {
+    marginBottom: spacing.md,
   },
   scrollContent: {
-    paddingBottom: 28
-  },
-  section: {
-    marginBottom: 24
-  },
-  sectionEyebrow: {
-    fontSize: 12,
-    fontWeight: "700",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-    color: "#64748b",
-    marginBottom: 4
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: 12
-  },
-  chatCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#dbeafe"
-  },
-  contactCard: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#bfdbfe"
+    paddingBottom: spacing.xxxl
   },
   chatCardDisabled: {
     opacity: 0.7
   },
-  chatEmail: {
-    fontWeight: "700",
-    fontSize: 16,
-    color: "#0f172a"
-  },
-  chatPreview: {
-    marginTop: 4,
-    color: "#475569"
-  },
-  empty: {
-    color: "#64748b",
-    marginTop: 6
-  },
   errorWrap: {
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
+    marginBottom: spacing.sm,
   },
   warnWrap: {
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12
-  },
-  error: {
-    flex: 1,
-    color: "#b91c1c"
-  },
-  warn: {
-    flex: 1,
-    color: "#b45309"
-  },
-  retry: {
-    color: "#2563eb",
-    fontWeight: "700"
+    marginBottom: spacing.sm,
   },
   loaderWrap: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10
-  },
-  loadingText: {
-    color: "#64748b"
+    flex: 1
   },
   chatWrap: {
     flex: 1
   },
   messageList: {
-    paddingBottom: 12
-  },
-  messageBubble: {
-    maxWidth: "78%",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8
-  },
-  mine: {
-    alignSelf: "flex-end",
-    backgroundColor: "#0f172a"
-  },
-  theirs: {
-    alignSelf: "flex-start",
-    backgroundColor: "#dbeafe"
-  },
-  mineText: {
-    color: "#ffffff"
-  },
-  theirsText: {
-    color: "#0f172a"
+    paddingBottom: spacing.md
   },
   composer: {
     flexDirection: "row",
-    gap: 8,
-    paddingVertical: 8
+    alignItems: "flex-end",
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  inputWrap: {
+    flex: 1
   },
   input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    backgroundColor: "#ffffff"
-  },
-  sendButton: {
-    backgroundColor: "#1d4ed8",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    alignItems: "center",
-    justifyContent: "center"
-  },
-  sendButtonDisabled: {
-    opacity: 0.75
-  },
-  sendText: {
-    color: "#ffffff",
-    fontWeight: "700"
+    minHeight: 48
   }
 });

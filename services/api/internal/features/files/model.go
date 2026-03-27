@@ -27,8 +27,8 @@ type FilesResponse struct {
 }
 
 type CreateFileRequest struct {
-	Filename   string `json:"filename" binding:"required"`
-	MimeType   string `json:"mimeType" binding:"required"`
-	SizeBytes  int64  `json:"sizeBytes" binding:"min=0"`
-	StorageKey string `json:"storageKey" binding:"required"`
+	Filename   string `json:"filename" binding:"required,max=255"`
+	MimeType   string `json:"mimeType" binding:"required,max=255"`
+	SizeBytes  int64  `json:"sizeBytes" binding:"min=0,max=104857600"`
+	StorageKey string `json:"storageKey" binding:"required,max=512"`
 }

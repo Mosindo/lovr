@@ -10,6 +10,7 @@ import (
 )
 
 var ErrSubscriptionNotFound = errors.New("subscription not found")
+var ErrBillingContextNotFound = errors.New("billing context not found")
 
 type SubscriptionUpsertParams struct {
 	OrganizationID        string
@@ -40,10 +41,18 @@ type StoredSubscription struct {
 	UpdatedAt             time.Time
 }
 
+type BillingContext struct {
+	OrganizationID   string
+	BillingEmail     string
+	StripeCustomerID string
+}
+
 type Repository interface {
 	UpsertSubscription(ctx context.Context, params SubscriptionUpsertParams) (StoredSubscription, error)
 	GetByStripeSubscriptionID(ctx context.Context, stripeSubscriptionID string) (StoredSubscription, error)
 	GetByStripeCheckoutSession(ctx context.Context, stripeCheckoutSessionID string) (StoredSubscription, error)
+	GetByOrganization(ctx context.Context, organizationID string) (StoredSubscription, error)
+	GetBillingContext(ctx context.Context, organizationID, userID string) (BillingContext, error)
 }
 
 type PGRepository struct {
@@ -133,6 +142,45 @@ func (r *PGRepository) GetByStripeCheckoutSession(ctx context.Context, stripeChe
 		FROM subscriptions
 		WHERE stripe_checkout_session_id = $1
 	`, stripeCheckoutSessionID)
+}
+
+func (r *PGRepository) GetByOrganization(ctx context.Context, organizationID string) (StoredSubscription, error) {
+	return r.getOne(ctx, `
+		SELECT id, organization_id, provider, COALESCE(stripe_customer_id, ''), COALESCE(stripe_subscription_id, ''),
+		       COALESCE(stripe_checkout_session_id, ''), status, current_period_start, current_period_end,
+		       cancel_at_period_end, canceled_at, created_at, updated_at
+		FROM subscriptions
+		WHERE organization_id = $1
+		  AND provider = 'stripe'
+	`, organizationID)
+}
+
+func (r *PGRepository) GetBillingContext(ctx context.Context, organizationID, userID string) (BillingContext, error) {
+	var billing BillingContext
+	err := r.dbPool.QueryRow(ctx, `
+		SELECT
+			u.organization_id,
+			u.email,
+			COALESCE(s.stripe_customer_id, '')
+		FROM users u
+		LEFT JOIN subscriptions s
+		  ON s.organization_id = u.organization_id
+		 AND s.provider = 'stripe'
+		WHERE u.id = $1
+		  AND u.organization_id = $2
+		LIMIT 1
+	`, userID, organizationID).Scan(
+		&billing.OrganizationID,
+		&billing.BillingEmail,
+		&billing.StripeCustomerID,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return BillingContext{}, ErrBillingContextNotFound
+		}
+		return BillingContext{}, err
+	}
+	return billing, nil
 }
 
 func (r *PGRepository) getOne(ctx context.Context, query, value string) (StoredSubscription, error) {

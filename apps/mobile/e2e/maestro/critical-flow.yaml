@@ -1,5 +1,5 @@
 appId: ${APP_ID}
-name: Boilerplate Critical Flow
+name: go-react-saas Critical Flow
 ---
 - launchApp:
     clearState: true
@@ -19,13 +19,13 @@ name: Boilerplate Critical Flow
 
 - tapOn:
     id: home-post-title-input
-- inputText: Maestro boilerplate post
+- inputText: Maestro go-react-saas post
 - tapOn:
     id: home-post-body-input
 - inputText: Validating the generic home feed from the UI flow.
 - tapOn:
     id: home-post-submit-button
-- assertVisible: Maestro boilerplate post
+- assertVisible: Maestro go-react-saas post
 
 - tapOn: Chat
 - assertVisible:

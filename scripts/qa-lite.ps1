@@ -94,7 +94,7 @@ finally {
 
 $stamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
 $header = @(
-  "Boilerplate QA Lite Report",
+  "go-react-saas QA Lite Report",
   "Generated: $stamp",
   "API Base URL: $ApiBaseUrl",
   ""
