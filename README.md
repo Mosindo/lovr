@@ -110,7 +110,9 @@ Within `apps/mobile/src`:
 - `api` contains REST clients
 - `hooks` contains React Query-powered auth/session hooks
 - `screens` contains route-level UI
-- `components/ui` contains reusable UI building blocks
+- `shared/ui` contains reusable UI primitives and tokens
+- `shared/layout` contains global layout and navigation shells
+- `shared/feedback` contains reusable loading, error, and empty states
 - `store` contains token/session persistence
 - `theme` contains shared design tokens
 - `utils` contains shared helpers
@@ -132,6 +134,7 @@ PowerShell:
 
 ```powershell
 $env:JWT_SECRET='change-me-in-dev'
+$env:APP_BASE_URL='http://localhost:18080'
 docker compose up --build -d
 ```
 
@@ -139,10 +142,19 @@ Bash:
 
 ```bash
 export JWT_SECRET='change-me-in-dev'
+export APP_BASE_URL='http://localhost:18080'
 docker compose up --build -d
 ```
 
 The API is exposed on `http://localhost:18080`.
+
+Optional Stripe billing variables:
+
+```powershell
+$env:STRIPE_SECRET_KEY='sk_test_...'
+$env:STRIPE_WEBHOOK_SECRET='whsec_...'
+$env:STRIPE_PRICE_ID='price_...'
+```
 
 Health check:
 
@@ -216,6 +228,28 @@ Repository-wide QA:
 powershell -ExecutionPolicy Bypass -File .\scripts\qa-lite.ps1 -ApiBaseUrl http://localhost:18080
 ```
 
+## Stripe Billing And MCP
+
+Backend billing is already wired for:
+- `POST /billing/checkout`
+- `GET /billing/subscription`
+- `POST /billing/webhook`
+
+Required environment variables for a live Stripe flow:
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `STRIPE_PRICE_ID`
+- `APP_BASE_URL`
+
+`APP_BASE_URL` should be the public URL that Stripe redirects back to after checkout. In local Docker runs, `http://localhost:18080` is fine for backend verification. For device testing or hosted environments, use a reachable public or LAN URL instead.
+
+Codex MCP Stripe reference config is stored in [config.toml](.codex/config.toml). The shared Codex config on this machine now also includes:
+
+```toml
+[mcp_servers.stripe]
+url = "https://mcp.stripe.com"
+```
+
 ## How To Add New Features
 
 Use the existing vertical-slice pattern and keep naming generic.
@@ -237,9 +271,10 @@ Current SaaS-oriented backend foundations include:
 ### Frontend
 1. Add API client functions in `apps/mobile/src/api`.
 2. Add or extend screens in `apps/mobile/src/screens`.
-3. Extract reusable UI into `apps/mobile/src/components/ui`.
-4. Keep tokens and storage concerns centralized in `theme` and `store`.
-5. Re-run TypeScript and smoke checks after changes.
+3. Extract reusable UI into `apps/mobile/src/shared/ui`.
+4. Keep layout concerns in `shared/layout` and stateful feedback in `shared/feedback`.
+5. Keep tokens and storage concerns centralized in `theme` and `store`.
+6. Re-run TypeScript and smoke checks after changes.
 
 ## Additional Documentation
 

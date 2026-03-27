@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { getAccessToken } from "../store/tokenStore";
 import { showGlobalError } from "../shared/feedback";
 
@@ -5,7 +6,24 @@ export type ApiErrorPayload = {
   error?: string;
 };
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:18080";
+function normalizeBaseUrl(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function resolveApiBaseUrl(): string {
+  const explicitBaseUrl = process.env.EXPO_PUBLIC_API_URL?.trim();
+  if (explicitBaseUrl) {
+    return normalizeBaseUrl(explicitBaseUrl);
+  }
+
+  if (Platform.OS === "android") {
+    return "http://10.0.2.2:18080";
+  }
+
+  return "http://localhost:18080";
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export class ApiError extends Error {
   public status: number;
@@ -27,8 +45,7 @@ async function getToken(): Promise<string | null> {
 function mergeHeaders(base: HeadersInit | undefined, injected?: Record<string, string>): Headers {
   const headers = new Headers();
 
-  // Ensure consistent JSON API behavior.
-  headers.set("Content-Type", "application/json");
+  headers.set("Accept", "application/json");
 
   if (base) {
     new Headers(base).forEach((value, key) => {
@@ -45,6 +62,26 @@ function mergeHeaders(base: HeadersInit | undefined, injected?: Record<string, s
   }
 
   return headers;
+}
+
+function shouldSetJsonContentType(body: BodyInit | null | undefined): boolean {
+  return body !== undefined && body !== null && !(body instanceof FormData);
+}
+
+function formatNetworkHint(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return "Network error. Check your connection and API availability, then try again.";
+  }
+
+  if (Platform.OS === "android") {
+    return "Network error. Android emulators usually need 10.0.2.2, and physical devices need EXPO_PUBLIC_API_URL set to your LAN IP.";
+  }
+
+  if (Platform.OS === "ios") {
+    return "Network error. iOS simulators can use localhost, but physical devices need EXPO_PUBLIC_API_URL set to your LAN IP.";
+  }
+
+  return "Network error. Check your connection and try again.";
 }
 
 export async function apiRequest<T = unknown>(path: string, options?: RequestInit): Promise<T> {
@@ -64,6 +101,9 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
     }
 
     const headers = mergeHeaders(options?.headers, authHeader);
+    if (!headers.has("Content-Type") && shouldSetJsonContentType(options?.body)) {
+      headers.set("Content-Type", "application/json");
+    }
     const response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
       headers,
@@ -80,8 +120,11 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
       }
 
       const apiPayload = data as ApiErrorPayload | null;
-      const message = apiPayload?.error ?? `API request failed (${response.status})`;
-      if (response.status >= 500) {
+      let message = apiPayload?.error ?? `API request failed (${response.status})`;
+      if (response.status === 401) {
+        message = apiPayload?.error ?? "Your session is no longer valid. Please sign in again.";
+      }
+      if (response.status >= 500 || response.status === 401) {
         showGlobalError(message);
       }
       throw new ApiError(response.status, data, message);
@@ -101,7 +144,7 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
     }
 
     if (err instanceof TypeError) {
-      showGlobalError("Network error. Check your connection and try again.");
+      showGlobalError(formatNetworkHint());
     }
     throw err;
   } finally {

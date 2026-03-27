@@ -1,5 +1,6 @@
 import { type AuthUser } from "./auth";
-import { request } from "../utils/http";
+import { apiRequest } from "./client";
+import { endpoints } from "./endpoints";
 
 export type PlatformUser = AuthUser;
 
@@ -39,6 +40,29 @@ export type Notification = {
   readAt?: string;
 };
 
+export type BillingSubscription = {
+  id?: string;
+  organizationId: string;
+  provider: string;
+  status: string;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripeCheckoutSessionId?: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd: boolean;
+  canceledAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type BillingCheckoutSession = {
+  sessionId: string;
+  checkoutUrl: string;
+  organizationId: string;
+  status: string;
+};
+
 type UsersResponse = {
   users: PlatformUser[];
 };
@@ -70,7 +94,7 @@ function authHeaders(token: string): Record<string, string> {
 }
 
 export async function listUsers(token: string): Promise<PlatformUser[]> {
-  const payload = await request<UsersResponse>("/users", {
+  const payload = await apiRequest<UsersResponse>(endpoints.users.list, {
     method: "GET",
     headers: authHeaders(token)
   });
@@ -78,7 +102,7 @@ export async function listUsers(token: string): Promise<PlatformUser[]> {
 }
 
 export async function listPosts(token: string): Promise<Post[]> {
-  const payload = await request<PostsResponse>("/posts", {
+  const payload = await apiRequest<PostsResponse>(endpoints.posts.list, {
     method: "GET",
     headers: authHeaders(token)
   });
@@ -86,7 +110,7 @@ export async function listPosts(token: string): Promise<Post[]> {
 }
 
 export async function createPost(token: string, title: string, body: string): Promise<Post> {
-  return request<Post>("/posts", {
+  return apiRequest<Post>(endpoints.posts.create, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({ title, body })
@@ -94,7 +118,7 @@ export async function createPost(token: string, title: string, body: string): Pr
 }
 
 export async function listChats(token: string): Promise<ChatSummary[]> {
-  const payload = await request<ChatsResponse>("/chats", {
+  const payload = await apiRequest<ChatsResponse>(endpoints.chat.chats, {
     method: "GET",
     headers: authHeaders(token)
   });
@@ -102,7 +126,7 @@ export async function listChats(token: string): Promise<ChatSummary[]> {
 }
 
 export async function listChatMessages(token: string, userId: string): Promise<ChatMessage[]> {
-  const payload = await request<ChatMessagesResponse>(`/chats/${userId}/messages`, {
+  const payload = await apiRequest<ChatMessagesResponse>(endpoints.chat.messages(userId), {
     method: "GET",
     headers: authHeaders(token)
   });
@@ -110,7 +134,7 @@ export async function listChatMessages(token: string, userId: string): Promise<C
 }
 
 export async function sendChatMessage(token: string, userId: string, content: string): Promise<ChatMessage> {
-  return request<ChatMessage>(`/chats/${userId}/messages`, {
+  return apiRequest<ChatMessage>(endpoints.chat.messages(userId), {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify({ content })
@@ -118,7 +142,7 @@ export async function sendChatMessage(token: string, userId: string, content: st
 }
 
 export async function listNotifications(token: string): Promise<Notification[]> {
-  const payload = await request<NotificationsResponse>("/notifications", {
+  const payload = await apiRequest<NotificationsResponse>(endpoints.notifications.list, {
     method: "GET",
     headers: authHeaders(token)
   });
@@ -126,7 +150,7 @@ export async function listNotifications(token: string): Promise<Notification[]> 
 }
 
 export async function createNotification(token: string, input: CreateNotificationInput): Promise<Notification> {
-  return request<Notification>("/notifications", {
+  return apiRequest<Notification>(endpoints.notifications.create, {
     method: "POST",
     headers: authHeaders(token),
     body: JSON.stringify(input)
@@ -134,7 +158,21 @@ export async function createNotification(token: string, input: CreateNotificatio
 }
 
 export async function markNotificationRead(token: string, notificationId: string): Promise<Notification> {
-  return request<Notification>(`/notifications/${notificationId}/read`, {
+  return apiRequest<Notification>(endpoints.notifications.markRead(notificationId), {
+    method: "POST",
+    headers: authHeaders(token)
+  });
+}
+
+export async function getBillingSubscription(token: string): Promise<BillingSubscription> {
+  return apiRequest<BillingSubscription>(endpoints.billing.subscription, {
+    method: "GET",
+    headers: authHeaders(token)
+  });
+}
+
+export async function createBillingCheckout(token: string): Promise<BillingCheckoutSession> {
+  return apiRequest<BillingCheckoutSession>(endpoints.billing.checkout, {
     method: "POST",
     headers: authHeaders(token)
   });

@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { Image, StyleSheet, View, type ImageStyle, type StyleProp, type TextStyle, type ViewStyle } from "react-native";
 import { Text } from "./Text";
-import { colors } from "./tokens";
+import { colors, controls } from "./tokens";
 
 export type AvatarProps = {
   name?: string;
@@ -36,7 +36,9 @@ const styles = StyleSheet.create({
   container: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.primaryBorder,
     overflow: "hidden"
   },
   image: {
@@ -45,7 +47,7 @@ const styles = StyleSheet.create({
   }
 });
 
-export function Avatar({ name, size = 44, style, textStyle, uri }: AvatarProps) {
+export function Avatar({ name, size = controls.avatar.md, style, textStyle, uri }: AvatarProps) {
   const initials = useMemo(() => getInitials(name), [name]);
 
   return (
@@ -65,8 +67,8 @@ export function Avatar({ name, size = 44, style, textStyle, uri }: AvatarProps) 
       ) : (
         <Text
           style={textStyle}
-          tone="inverse"
-          variant={size >= 52 ? "title" : "label"}
+          tone="primary"
+          variant={size >= controls.avatar.lg ? "heading" : "label"}
           weight="bold"
         >
           {initials}

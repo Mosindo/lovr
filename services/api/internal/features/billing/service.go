@@ -68,12 +68,28 @@ func NewService(repo Repository, cfg Config) *Service {
 	}
 }
 
-func (s *Service) Checkout(ctx context.Context, organizationID string) (CheckoutResponse, error) {
+func (s *Service) Checkout(ctx context.Context, organizationID, userID string) (CheckoutResponse, error) {
 	if strings.TrimSpace(organizationID) == "" {
 		return CheckoutResponse{}, ErrOrganizationRequired
 	}
 	if !s.checkoutConfigured() {
 		return CheckoutResponse{}, ErrBillingUnavailable
+	}
+	if strings.TrimSpace(userID) == "" {
+		return CheckoutResponse{}, ErrOrganizationRequired
+	}
+
+	billingContext, err := s.repo.GetBillingContext(ctx, organizationID, userID)
+	if err != nil {
+		return CheckoutResponse{}, err
+	}
+
+	customerID := billingContext.StripeCustomerID
+	if customerID == "" {
+		customerID, err = s.createStripeCustomer(ctx, billingContext.BillingEmail, organizationID)
+		if err != nil {
+			return CheckoutResponse{}, err
+		}
 	}
 
 	form := url.Values{}
@@ -85,6 +101,7 @@ func (s *Service) Checkout(ctx context.Context, organizationID string) (Checkout
 	form.Set("client_reference_id", organizationID)
 	form.Set("metadata[organization_id]", organizationID)
 	form.Set("subscription_data[metadata][organization_id]", organizationID)
+	form.Set("customer", customerID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, stripeAPIBaseURL+"/checkout/sessions", strings.NewReader(form.Encode()))
 	if err != nil {
@@ -112,10 +129,11 @@ func (s *Service) Checkout(ctx context.Context, organizationID string) (Checkout
 		return CheckoutResponse{}, fmt.Errorf("%w: invalid stripe response", ErrCheckoutSessionFailed)
 	}
 
+	storedCustomerID := coalesce(session.Customer, customerID)
 	if _, err := s.repo.UpsertSubscription(ctx, SubscriptionUpsertParams{
 		OrganizationID:        organizationID,
 		Provider:              defaultProvider,
-		StripeCustomerID:      session.Customer,
+		StripeCustomerID:      storedCustomerID,
 		StripeSubscriptionID:  session.Subscription,
 		StripeCheckoutSession: session.ID,
 		Status:                coalesce(session.Status, "checkout_open"),
@@ -128,6 +146,40 @@ func (s *Service) Checkout(ctx context.Context, organizationID string) (Checkout
 		CheckoutURL:    session.URL,
 		OrganizationID: organizationID,
 		Status:         coalesce(session.Status, "checkout_open"),
+	}, nil
+}
+
+func (s *Service) GetSubscription(ctx context.Context, organizationID string) (Subscription, error) {
+	if strings.TrimSpace(organizationID) == "" {
+		return Subscription{}, ErrOrganizationRequired
+	}
+
+	stored, err := s.repo.GetByOrganization(ctx, organizationID)
+	if err != nil {
+		if errors.Is(err, ErrSubscriptionNotFound) {
+			return Subscription{
+				OrganizationID: organizationID,
+				Provider:       defaultProvider,
+				Status:         "inactive",
+			}, nil
+		}
+		return Subscription{}, err
+	}
+
+	return Subscription{
+		ID:                    stored.ID,
+		OrganizationID:        stored.OrganizationID,
+		Provider:              stored.Provider,
+		StripeCustomerID:      stored.StripeCustomerID,
+		StripeSubscriptionID:  stored.StripeSubscriptionID,
+		StripeCheckoutSession: stored.StripeCheckoutSession,
+		Status:                stored.Status,
+		CurrentPeriodStart:    stored.CurrentPeriodStart,
+		CurrentPeriodEnd:      stored.CurrentPeriodEnd,
+		CancelAtPeriodEnd:     stored.CancelAtPeriodEnd,
+		CanceledAt:            stored.CanceledAt,
+		CreatedAt:             stored.CreatedAt,
+		UpdatedAt:             stored.UpdatedAt,
 	}, nil
 }
 
@@ -215,6 +267,43 @@ func (s *Service) handleSubscriptionUpdated(ctx context.Context, raw json.RawMes
 
 func (s *Service) checkoutConfigured() bool {
 	return s.stripeSecretKey != "" && s.stripePriceID != "" && s.appBaseURL != ""
+}
+
+func (s *Service) createStripeCustomer(ctx context.Context, email, organizationID string) (string, error) {
+	form := url.Values{}
+	form.Set("email", strings.TrimSpace(email))
+	form.Set("metadata[organization_id]", organizationID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, stripeAPIBaseURL+"/customers", strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+s.stripeSecretKey)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrCheckoutSessionFailed, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("%w: %v", ErrCheckoutSessionFailed, err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("%w: status=%d body=%s", ErrCheckoutSessionFailed, resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var customer stripeCustomerResponse
+	if err := json.Unmarshal(body, &customer); err != nil {
+		return "", fmt.Errorf("%w: invalid stripe customer response", ErrCheckoutSessionFailed)
+	}
+	if strings.TrimSpace(customer.ID) == "" {
+		return "", fmt.Errorf("%w: missing stripe customer id", ErrCheckoutSessionFailed)
+	}
+
+	return customer.ID, nil
 }
 
 func verifyStripeSignature(payload []byte, header, secret string, now time.Time) error {

@@ -6,19 +6,19 @@ import (
 )
 
 type Subscription struct {
-	ID                    string
-	OrganizationID        string
-	Provider              string
-	StripeCustomerID      string
-	StripeSubscriptionID  string
-	StripeCheckoutSession string
-	Status                string
-	CurrentPeriodStart    *time.Time
-	CurrentPeriodEnd      *time.Time
-	CancelAtPeriodEnd     bool
-	CanceledAt            *time.Time
-	CreatedAt             time.Time
-	UpdatedAt             time.Time
+	ID                    string     `json:"id"`
+	OrganizationID        string     `json:"organizationId"`
+	Provider              string     `json:"provider"`
+	StripeCustomerID      string     `json:"stripeCustomerId,omitempty"`
+	StripeSubscriptionID  string     `json:"stripeSubscriptionId,omitempty"`
+	StripeCheckoutSession string     `json:"stripeCheckoutSessionId,omitempty"`
+	Status                string     `json:"status"`
+	CurrentPeriodStart    *time.Time `json:"currentPeriodStart,omitempty"`
+	CurrentPeriodEnd      *time.Time `json:"currentPeriodEnd,omitempty"`
+	CancelAtPeriodEnd     bool       `json:"cancelAtPeriodEnd"`
+	CanceledAt            *time.Time `json:"canceledAt,omitempty"`
+	CreatedAt             time.Time  `json:"createdAt"`
+	UpdatedAt             time.Time  `json:"updatedAt"`
 }
 
 type CheckoutResponse struct {
@@ -30,6 +30,11 @@ type CheckoutResponse struct {
 
 type WebhookResponse struct {
 	Received bool `json:"received"`
+}
+
+type stripeCustomerResponse struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
 }
 
 type stripeCheckoutSessionResponse struct {

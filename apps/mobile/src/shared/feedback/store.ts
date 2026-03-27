@@ -2,16 +2,20 @@ import { useSyncExternalStore } from "react";
 
 type FeedbackState = {
   error: string | null;
+  errors: string[];
   loadingCount: number;
   loadingLabel: string | null;
+  loadingLabels: string[];
 };
 
 type Listener = () => void;
 
 let state: FeedbackState = {
   error: null,
+  errors: [],
   loadingCount: 0,
-  loadingLabel: null
+  loadingLabel: null,
+  loadingLabels: []
 };
 
 const listeners = new Set<Listener>();
@@ -32,20 +36,23 @@ function getSnapshot(): FeedbackState {
 }
 
 export function beginGlobalLoading(label = "Working...") {
+  const nextLabels = [...state.loadingLabels, label];
   state = {
     ...state,
-    loadingCount: state.loadingCount + 1,
-    loadingLabel: label
+    loadingCount: nextLabels.length,
+    loadingLabel: nextLabels.at(-1) ?? null,
+    loadingLabels: nextLabels
   };
   emit();
 }
 
 export function endGlobalLoading() {
-  const nextCount = Math.max(0, state.loadingCount - 1);
+  const nextLabels = state.loadingLabels.slice(0, -1);
   state = {
     ...state,
-    loadingCount: nextCount,
-    loadingLabel: nextCount === 0 ? null : state.loadingLabel
+    loadingCount: nextLabels.length,
+    loadingLabel: nextLabels.at(-1) ?? null,
+    loadingLabels: nextLabels
   };
   emit();
 }
@@ -54,20 +61,26 @@ export function showGlobalError(message: string) {
   if (!message) {
     return;
   }
+
+  const nextErrors = state.errors.at(-1) === message ? state.errors : [...state.errors, message];
   state = {
     ...state,
-    error: message
+    error: nextErrors.at(-1) ?? null,
+    errors: nextErrors
   };
   emit();
 }
 
 export function clearGlobalError() {
-  if (state.error === null) {
+  if (state.errors.length === 0) {
     return;
   }
+
+  const nextErrors = state.errors.slice(0, -1);
   state = {
     ...state,
-    error: null
+    error: nextErrors.at(-1) ?? null,
+    errors: nextErrors
   };
   emit();
 }

@@ -1,7 +1,7 @@
 import React from "react";
 import { ActivityIndicator, StyleSheet, View, type ActivityIndicatorProps, type StyleProp, type ViewStyle } from "react-native";
 import { Text } from "./Text";
-import { colors, spacing } from "./tokens";
+import { colors, spacing, typography } from "./tokens";
 
 export type LoaderProps = {
   fullScreen?: boolean;
@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm
+    gap: spacing.md
   }
 });
 
@@ -28,7 +28,11 @@ export function Loader({ fullScreen = false, label, size = "large", style }: Loa
   return (
     <View style={[fullScreen ? styles.fullScreen : styles.inline, style]}>
       <ActivityIndicator color={colors.primary} size={size} />
-      {label ? <Text tone="muted">{label}</Text> : null}
+      {label ? (
+        <Text style={typography.label} tone="muted">
+          {label}
+        </Text>
+      ) : null}
     </View>
   );
 }

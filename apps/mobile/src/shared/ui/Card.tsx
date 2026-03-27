@@ -6,6 +6,8 @@ export type CardVariant = "default" | "muted" | "accent";
 export type CardPadding = "sm" | "md" | "lg" | "xl";
 
 export type CardProps = Omit<ViewProps, "style"> & {
+  interactive?: boolean;
+  selected?: boolean;
   variant?: CardVariant;
   padding?: CardPadding;
   style?: StyleProp<ViewStyle>;
@@ -16,15 +18,24 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.backgroundElevated,
     ...shadows.card
   },
   muted: {
     backgroundColor: colors.surfaceMuted
   },
   accent: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#bfdbfe"
+    backgroundColor: colors.surfaceAccent,
+    borderColor: colors.primaryBorder
+  },
+  interactive: {
+    borderColor: colors.borderStrong,
+    ...shadows.floating
+  },
+  selected: {
+    backgroundColor: colors.surfaceAccent,
+    borderColor: colors.primaryBorder,
+    ...shadows.floating
   },
   paddingSm: {
     padding: spacing.md
@@ -54,8 +65,19 @@ const paddingStyles: Record<CardPadding, ViewStyle> = {
 };
 
 export function Card({ children, padding = "md", style, variant = "default", ...props }: CardProps) {
+  const { interactive = false, selected = false, ...viewProps } = props;
   return (
-    <View style={[styles.base, variantStyles[variant], paddingStyles[padding], style]} {...props}>
+    <View
+      style={[
+        styles.base,
+        variantStyles[variant],
+        interactive ? styles.interactive : null,
+        selected ? styles.selected : null,
+        paddingStyles[padding],
+        style
+      ]}
+      {...viewProps}
+    >
       {children}
     </View>
   );

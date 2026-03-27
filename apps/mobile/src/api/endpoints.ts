@@ -21,6 +21,10 @@ export const endpoints = {
     list: "/notifications",
     create: "/notifications",
     markRead: (notificationId: string) => `/notifications/${notificationId}/read`
+  },
+  billing: {
+    subscription: "/billing/subscription",
+    checkout: "/billing/checkout",
+    webhook: "/billing/webhook"
   }
 } as const;
-

@@ -41,8 +41,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.xxxl + spacing.xl
   },
   centered: {
     justifyContent: "center"

@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import {
-  createNotification,
   listNotifications,
   markNotificationRead,
   type Notification
 } from "../api/platform";
 import { Header, ScreenContainer } from "../shared/layout";
-import { Button, Card, Loader, Text, colors, radii, spacing } from "../shared/ui";
+import { EmptyView, ErrorView, LoadingView } from "../shared/feedback";
+import { Button, NotificationItem, spacing } from "../shared/ui";
 
 type NotificationsScreenProps = {
   token: string;
@@ -24,7 +24,6 @@ function formatNotificationDate(value: string): string {
 export default function NotificationsScreen({ token }: NotificationsScreenProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -43,23 +42,6 @@ export default function NotificationsScreen({ token }: NotificationsScreenProps)
   useEffect(() => {
     load();
   }, [load]);
-
-  async function onCreateSample() {
-    setCreating(true);
-    setError(null);
-    try {
-      const created = await createNotification(token, {
-        type: "system",
-        title: "go-react-saas ready",
-        body: "Your generic mobile workspace is connected to the shared platform modules."
-      });
-      setNotifications((prev) => [created, ...prev.filter((item) => item.id !== created.id)]);
-    } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "could not create notification");
-    } finally {
-      setCreating(false);
-    }
-  }
 
   async function onMarkRead(item: Notification) {
     if (item.isRead) {
@@ -82,7 +64,7 @@ export default function NotificationsScreen({ token }: NotificationsScreenProps)
   if (loading && notifications.length === 0) {
     return (
       <ScreenContainer testID="notifications-screen">
-        <Loader fullScreen label="Loading notifications..." />
+        <LoadingView fullScreen label="Loading notifications..." />
       </ScreenContainer>
     );
   }
@@ -93,20 +75,12 @@ export default function NotificationsScreen({ token }: NotificationsScreenProps)
         action={
           <View style={styles.actions}>
             <Button
-              disabled={creating || loading}
+              disabled={loading}
               label="Reload"
               onPress={load}
               size="sm"
               testID="notifications-reload-button"
               variant="outline"
-            />
-            <Button
-              disabled={creating || loading}
-              label={creating ? "Creating..." : "Sample"}
-              onPress={onCreateSample}
-              size="sm"
-              testID="notifications-create-sample-button"
-              variant="secondary"
             />
           </View>
         }
@@ -117,9 +91,7 @@ export default function NotificationsScreen({ token }: NotificationsScreenProps)
       />
 
       {error ? (
-        <Text style={styles.error} tone="danger" variant="label" weight="medium">
-          {error}
-        </Text>
+        <ErrorView actionLabel="Retry" message={error} onAction={() => void load()} style={styles.error} />
       ) : null}
 
       <FlatList
@@ -127,35 +99,20 @@ export default function NotificationsScreen({ token }: NotificationsScreenProps)
         data={notifications}
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
-          <Text style={styles.empty} tone="muted">
-            No notifications yet. Create a sample to test the flow.
-          </Text>
+          <EmptyView
+            message="Notifications from messages, posts, and account activity will appear here."
+            title="No notifications yet"
+          />
         }
         renderItem={({ item }) => (
-          <Pressable onPress={() => void onMarkRead(item)}>
-            <Card style={styles.card} variant={item.isRead ? "muted" : "default"}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle} variant="heading" weight="bold">
-                  {item.title}
-                </Text>
-                <Text
-                  style={[styles.badge, item.isRead ? styles.badgeRead : styles.badgeUnread]}
-                  tone={item.isRead ? "secondary" : "primary"}
-                  variant="caption"
-                  weight="bold"
-                >
-                  {item.isRead ? "Read" : "Unread"}
-                </Text>
-              </View>
-              <Text style={styles.cardType} tone="secondary" variant="eyebrow" weight="bold">
-                {item.type}
-              </Text>
-              <Text style={styles.cardBody}>{item.body}</Text>
-              <Text style={styles.meta} tone="muted" variant="caption">
-                {formatNotificationDate(item.createdAt)}
-              </Text>
-            </Card>
-          </Pressable>
+          <NotificationItem
+            body={item.body}
+            createdAtLabel={formatNotificationDate(item.createdAt)}
+            isRead={item.isRead}
+            onPress={() => void onMarkRead(item)}
+            title={item.title}
+            type={item.type}
+          />
         )}
       />
     </ScreenContainer>
@@ -164,57 +121,17 @@ export default function NotificationsScreen({ token }: NotificationsScreenProps)
 
 const styles = StyleSheet.create({
   headerShell: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   actions: {
     flexDirection: "row",
     gap: spacing.sm,
-    paddingTop: spacing.sm
+    paddingTop: spacing.md
   },
   error: {
     marginBottom: spacing.sm
   },
   list: {
     paddingBottom: spacing.xxxl
-  },
-  empty: {
-    textAlign: "center",
-    marginTop: spacing.xxl
-  },
-  card: {
-    marginBottom: spacing.md
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: spacing.md,
-    marginBottom: spacing.sm
-  },
-  cardTitle: {
-    flex: 1,
-    color: colors.text
-  },
-  badge: {
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    overflow: "hidden"
-  },
-  badgeUnread: {
-    backgroundColor: "#dbeafe"
-  },
-  badgeRead: {
-    backgroundColor: "#d1fae5"
-  },
-  cardType: {
-    marginBottom: spacing.sm
-  },
-  cardBody: {
-    color: colors.text,
-    lineHeight: 22
-  },
-  meta: {
-    marginTop: spacing.md
   }
 });

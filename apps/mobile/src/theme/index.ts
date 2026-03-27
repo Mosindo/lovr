@@ -6,17 +6,23 @@ export { tokens };
 export const themes = {
   light: {
     background: colors.background,
+    backgroundStrong: colors.backgroundElevated,
     backgroundHover: colors.surfaceMuted,
-    backgroundPress: colors.border,
+    backgroundPress: colors.surfaceSubtle,
     color: colors.text,
+    colorMuted: colors.textMuted,
     colorHover: colors.text,
     colorPress: colors.text,
     borderColor: colors.border,
-    borderColorHover: colors.border,
-    borderColorPress: colors.border,
+    borderColorHover: colors.borderStrong,
+    borderColorPress: colors.borderStrong,
     primary: colors.primary,
     primaryHover: colors.primary,
     primaryPress: colors.primary,
-    muted: colors.surfaceMuted
+    success: colors.success,
+    warning: colors.warning,
+    danger: colors.danger,
+    muted: colors.surfaceMuted,
+    accent: colors.surfaceAccent
   }
 } as const;

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,6 +18,8 @@ type stubRepository struct {
 	upserted            []SubscriptionUpsertParams
 	subscriptionByID    map[string]StoredSubscription
 	checkoutSessionByID map[string]StoredSubscription
+	organizationByID    map[string]StoredSubscription
+	billingContexts     map[string]BillingContext
 }
 
 func (r *stubRepository) UpsertSubscription(_ context.Context, params SubscriptionUpsertParams) (StoredSubscription, error) {
@@ -46,40 +49,83 @@ func (r *stubRepository) GetByStripeCheckoutSession(_ context.Context, stripeChe
 	return StoredSubscription{}, ErrSubscriptionNotFound
 }
 
-type stubDoer struct {
-	response *http.Response
-	err      error
+func (r *stubRepository) GetByOrganization(_ context.Context, organizationID string) (StoredSubscription, error) {
+	if stored, ok := r.organizationByID[organizationID]; ok {
+		return stored, nil
+	}
+	return StoredSubscription{}, ErrSubscriptionNotFound
 }
 
-func (d stubDoer) Do(_ *http.Request) (*http.Response, error) {
+func (r *stubRepository) GetBillingContext(_ context.Context, organizationID, userID string) (BillingContext, error) {
+	if ctx, ok := r.billingContexts[organizationID+":"+userID]; ok {
+		return ctx, nil
+	}
+	return BillingContext{}, ErrBillingContextNotFound
+}
+
+type capturedRequest struct {
+	URL    string
+	Method string
+	Body   string
+}
+
+type stubDoer struct {
+	responses []*http.Response
+	err       error
+	requests  []capturedRequest
+}
+
+func (d *stubDoer) Do(req *http.Request) (*http.Response, error) {
 	if d.err != nil {
 		return nil, d.err
 	}
-	return d.response, nil
+	body, _ := io.ReadAll(req.Body)
+	d.requests = append(d.requests, capturedRequest{
+		URL:    req.URL.String(),
+		Method: req.Method,
+		Body:   string(body),
+	})
+	if len(d.responses) == 0 {
+		return nil, errors.New("no stub response configured")
+	}
+	response := d.responses[0]
+	d.responses = d.responses[1:]
+	return response, nil
 }
 
 func TestCheckoutRequiresConfiguration(t *testing.T) {
 	repo := &stubRepository{}
 	svc := NewService(repo, Config{})
 
-	_, err := svc.Checkout(context.Background(), "org-1")
+	_, err := svc.Checkout(context.Background(), "org-1", "user-1")
 	if !errors.Is(err, ErrBillingUnavailable) {
 		t.Fatalf("expected ErrBillingUnavailable, got %v", err)
 	}
 }
 
-func TestCheckoutCreatesPendingSubscription(t *testing.T) {
-	repo := &stubRepository{}
+func TestCheckoutCreatesCustomerAndPendingSubscription(t *testing.T) {
+	repo := &stubRepository{
+		billingContexts: map[string]BillingContext{
+			"org-1:user-1": {
+				OrganizationID: "org-1",
+				BillingEmail:   "owner@example.com",
+			},
+		},
+	}
+	doer := &stubDoer{
+		responses: []*http.Response{
+			newJSONResponse(http.StatusOK, `{"id":"cus_test_123","email":"owner@example.com"}`),
+			newJSONResponse(http.StatusOK, `{"id":"cs_test_123","url":"https://checkout.stripe.test/session/cs_test_123","customer":"cus_test_123","status":"open"}`),
+		},
+	}
 	svc := NewService(repo, Config{
 		StripeSecretKey: "sk_test_123",
 		StripePriceID:   "price_test_123",
 		AppBaseURL:      "https://app.example.com",
-		HTTPClient: stubDoer{
-			response: newJSONResponse(http.StatusOK, `{"id":"cs_test_123","url":"https://checkout.stripe.test/session/cs_test_123","customer":"cus_test_123","status":"open"}`),
-		},
+		HTTPClient:      doer,
 	})
 
-	response, err := svc.Checkout(context.Background(), "org-1")
+	response, err := svc.Checkout(context.Background(), "org-1", "user-1")
 	if err != nil {
 		t.Fatalf("checkout: %v", err)
 	}
@@ -91,6 +137,52 @@ func TestCheckoutCreatesPendingSubscription(t *testing.T) {
 	}
 	if repo.upserted[0].OrganizationID != "org-1" {
 		t.Fatalf("expected organization id org-1, got %q", repo.upserted[0].OrganizationID)
+	}
+	if repo.upserted[0].StripeCustomerID != "cus_test_123" {
+		t.Fatalf("expected customer id cus_test_123, got %q", repo.upserted[0].StripeCustomerID)
+	}
+	if len(doer.requests) != 2 {
+		t.Fatalf("expected 2 outgoing stripe requests, got %d", len(doer.requests))
+	}
+	if !strings.HasSuffix(doer.requests[0].URL, "/customers") {
+		t.Fatalf("expected first request to /customers, got %q", doer.requests[0].URL)
+	}
+	if !strings.Contains(doer.requests[1].Body, "customer=cus_test_123") {
+		t.Fatalf("expected checkout request to include customer id, got body %q", doer.requests[1].Body)
+	}
+}
+
+func TestCheckoutReusesExistingCustomer(t *testing.T) {
+	repo := &stubRepository{
+		billingContexts: map[string]BillingContext{
+			"org-1:user-1": {
+				OrganizationID:   "org-1",
+				BillingEmail:     "owner@example.com",
+				StripeCustomerID: "cus_existing",
+			},
+		},
+	}
+	doer := &stubDoer{
+		responses: []*http.Response{
+			newJSONResponse(http.StatusOK, `{"id":"cs_test_123","url":"https://checkout.stripe.test/session/cs_test_123","customer":"cus_existing","status":"open"}`),
+		},
+	}
+	svc := NewService(repo, Config{
+		StripeSecretKey: "sk_test_123",
+		StripePriceID:   "price_test_123",
+		AppBaseURL:      "https://app.example.com",
+		HTTPClient:      doer,
+	})
+
+	_, err := svc.Checkout(context.Background(), "org-1", "user-1")
+	if err != nil {
+		t.Fatalf("checkout: %v", err)
+	}
+	if len(doer.requests) != 1 {
+		t.Fatalf("expected one outgoing stripe request, got %d", len(doer.requests))
+	}
+	if !strings.HasSuffix(doer.requests[0].URL, "/checkout/sessions") {
+		t.Fatalf("expected checkout session request, got %q", doer.requests[0].URL)
 	}
 }
 
@@ -157,6 +249,22 @@ func TestProcessWebhookFallsBackToStoredCheckoutOrganization(t *testing.T) {
 	}
 	if repo.upserted[0].Status != "paid" {
 		t.Fatalf("expected paid status, got %q", repo.upserted[0].Status)
+	}
+}
+
+func TestGetSubscriptionDefaultsToInactive(t *testing.T) {
+	repo := &stubRepository{}
+	svc := NewService(repo, Config{})
+
+	subscription, err := svc.GetSubscription(context.Background(), "org-1")
+	if err != nil {
+		t.Fatalf("get subscription: %v", err)
+	}
+	if subscription.Status != "inactive" {
+		t.Fatalf("expected inactive status, got %q", subscription.Status)
+	}
+	if subscription.OrganizationID != "org-1" {
+		t.Fatalf("expected organization id org-1, got %q", subscription.OrganizationID)
 	}
 }
 

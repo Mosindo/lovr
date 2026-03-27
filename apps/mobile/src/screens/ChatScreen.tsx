@@ -17,8 +17,9 @@ import {
   type ChatSummary,
   type PlatformUser
 } from "../api/platform";
-import { Header, ScreenContainer } from "../shared/layout";
-import { Avatar, Button, Card, Input, Loader, Text, colors, radii, spacing } from "../shared/ui";
+import { EmptyView, ErrorView, LoadingView } from "../shared/feedback";
+import { Header, ScreenContainer, Section } from "../shared/layout";
+import { Avatar, Button, Card, Input, ListItem, MessageItem, Notice, Text, colors, radii, spacing } from "../shared/ui";
 
 type ChatScreenProps = {
   token: string;
@@ -239,21 +240,20 @@ export default function ChatScreen({ token, currentUserId }: ChatScreenProps) {
     <ScreenContainer testID="chat-screen">
       <Header
         action={
-          <Pressable disabled={loading || sending} onPress={reloadCurrentView} testID="chat-reload-button">
-            <Text
-              style={[styles.reload, loading || sending ? styles.disabledAction : null]}
-              tone={loading || sending ? "muted" : "primary"}
-              variant="label"
-              weight="bold"
-            >
-              Reload
-            </Text>
-          </Pressable>
+          <Button
+            disabled={loading || sending}
+            label="Reload"
+            onPress={reloadCurrentView}
+            size="sm"
+            testID="chat-reload-button"
+            variant="outline"
+          />
         }
         eyebrow="Inbox"
         leading={
           selectedChat ? (
-            <Pressable
+            <Button
+              label="Back"
               onPress={() => {
                 setSelectedChat(null);
                 setMessages([]);
@@ -261,12 +261,10 @@ export default function ChatScreen({ token, currentUserId }: ChatScreenProps) {
                 setError(null);
                 setBackgroundError(null);
               }}
+              size="sm"
               testID="chat-back-button"
-            >
-              <Text style={styles.back} tone="primary" variant="label" weight="bold">
-                Back
-              </Text>
-            </Pressable>
+              variant="ghost"
+            />
           ) : null
         }
         style={styles.headerShell}
@@ -275,43 +273,20 @@ export default function ChatScreen({ token, currentUserId }: ChatScreenProps) {
       />
 
       {error ? (
-        <Card padding="sm" style={styles.errorWrap}>
-          <Text style={styles.error} tone="danger" variant="label" weight="medium">
-            {error}
-          </Text>
-          <Pressable disabled={loading || sending} onPress={reloadCurrentView}>
-            <Text
-              style={[styles.retry, loading || sending ? styles.disabledAction : null]}
-              tone={loading || sending ? "muted" : "primary"}
-              variant="label"
-              weight="bold"
-            >
-              Retry
-            </Text>
-          </Pressable>
-        </Card>
+        <ErrorView actionLabel="Retry" compact message={error} onAction={() => void reloadCurrentView()} style={styles.errorWrap} />
       ) : null}
 
       {!error && backgroundError ? (
-        <Card padding="sm" style={styles.warnWrap} variant="muted">
-          <Text style={styles.warn} tone="muted" variant="label" weight="medium">
-            {backgroundError}
-          </Text>
-          <Pressable disabled={loading || sending} onPress={reloadCurrentView}>
-            <Text
-              style={[styles.retry, loading || sending ? styles.disabledAction : null]}
-              tone={loading || sending ? "muted" : "primary"}
-              variant="label"
-              weight="bold"
-            >
-              Reload
-            </Text>
-          </Pressable>
-        </Card>
+        <Notice
+          description="The chat UI is still usable, but the latest background refresh did not complete."
+          style={styles.warnWrap}
+          title={backgroundError}
+          tone="warning"
+        />
       ) : null}
 
       {loading ? (
-        <Loader
+        <LoadingView
           fullScreen
           label={selectedChat ? "Loading conversation..." : "Loading chat workspace..."}
           style={styles.loaderWrap}
@@ -323,19 +298,14 @@ export default function ChatScreen({ token, currentUserId }: ChatScreenProps) {
             data={messages}
             keyExtractor={(item) => item.id}
             ListEmptyComponent={
-              <Text style={styles.empty} tone="muted">
-                No messages yet. Start the conversation.
-              </Text>
+              <EmptyView
+                message="Start with a quick hello to open the conversation."
+                title="No messages yet"
+              />
             }
             renderItem={({ item }) => {
               const mine = item.senderUserId === currentUserId;
-              return (
-                <View style={[styles.messageBubble, mine ? styles.mine : styles.theirs]}>
-                  <Text style={mine ? styles.mineText : styles.theirsText} tone={mine ? "inverse" : "default"}>
-                    {item.content}
-                  </Text>
-                </View>
-              );
+              return <MessageItem content={item.content} mine={mine} />;
             }}
           />
 
@@ -360,70 +330,41 @@ export default function ChatScreen({ token, currentUserId }: ChatScreenProps) {
         </KeyboardAvoidingView>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.section}>
-            <Text style={styles.sectionEyebrow} tone="secondary" variant="eyebrow" weight="bold">
-              Inbox
-            </Text>
-            <Text style={styles.sectionTitle} variant="heading" weight="bold">
-              Recent conversations
-            </Text>
+          <Section eyebrow="Inbox" title="Recent conversations">
             {chatList.length === 0 ? (
-              <Text style={styles.empty} tone="muted">
-                No conversations yet.
-              </Text>
+              <EmptyView message="New conversations will appear here as soon as you start messaging." title="No conversations yet" />
             ) : null}
             {chatList.map((chat) => (
-              <Pressable
+              <ListItem
                 key={chat.user.id}
                 disabled={loading || sending}
+                leading={<Avatar name={chat.user.email} size={40} />}
                 onPress={() => void openChat(chatSummaryToTarget(chat))}
-                style={[styles.chatCard, loading || sending ? styles.chatCardDisabled : null]}
+                style={loading || sending ? styles.chatCardDisabled : null}
+                subtitle={chat.lastMessage?.content ?? "Open conversation"}
                 testID={`chat-open-${chat.user.id}`}
-              >
-                <Avatar name={chat.user.email} size={40} />
-                <View style={styles.chatTextWrap}>
-                  <Text style={styles.chatEmail} variant="label" weight="bold">
-                    {chat.user.email}
-                  </Text>
-                  <Text style={styles.chatPreview} numberOfLines={1} tone="muted">
-                    {chat.lastMessage?.content ?? "Open conversation"}
-                  </Text>
-                </View>
-              </Pressable>
+                title={chat.user.email}
+              />
             ))}
-          </View>
+          </Section>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionEyebrow} tone="secondary" variant="eyebrow" weight="bold">
-              Directory
-            </Text>
-            <Text style={styles.sectionTitle} variant="heading" weight="bold">
-              Start a new conversation
-            </Text>
+          <Section eyebrow="Directory" title="Start a new conversation">
             {availableContacts.length === 0 ? (
-              <Text style={styles.empty} tone="muted">
-                No additional members available.
-              </Text>
+              <EmptyView message="Invite more teammates to unlock new conversations." title="No additional members available" />
             ) : null}
             {availableContacts.map((user) => (
-              <Pressable
+              <ListItem
                 key={user.id}
                 disabled={loading || sending}
+                leading={<Avatar name={user.email} size={40} />}
                 onPress={() => void openChat({ user })}
-                style={[styles.contactCard, loading || sending ? styles.chatCardDisabled : null]}
-              >
-                <Avatar name={user.email} size={40} />
-                <View style={styles.chatTextWrap}>
-                  <Text style={styles.chatEmail} variant="label" weight="bold">
-                    {user.email}
-                  </Text>
-                  <Text style={styles.chatPreview} tone="muted">
-                    Message this member
-                  </Text>
-                </View>
-              </Pressable>
+                style={loading || sending ? styles.chatCardDisabled : null}
+                subtitle="Message this member"
+                title={user.email}
+                variant="muted"
+              />
             ))}
-          </View>
+          </Section>
         </ScrollView>
       )}
     </ScreenContainer>
@@ -434,88 +375,17 @@ const styles = StyleSheet.create({
   headerShell: {
     marginBottom: spacing.md,
   },
-  back: {
-    color: colors.primary
-  },
-  reload: {
-    color: colors.primary
-  },
-  disabledAction: {
-    color: colors.textMuted
-  },
   scrollContent: {
     paddingBottom: spacing.xxxl
-  },
-  section: {
-    marginBottom: spacing.xxl
-  },
-  sectionEyebrow: {
-    marginBottom: spacing.xs
-  },
-  sectionTitle: {
-    marginBottom: spacing.md
-  },
-  chatCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border
-  },
-  contactCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border
   },
   chatCardDisabled: {
     opacity: 0.7
   },
-  chatTextWrap: {
-    flex: 1,
-    gap: spacing.xs
-  },
-  chatEmail: {
-    color: colors.text
-  },
-  chatPreview: {
-    color: colors.textMuted
-  },
-  empty: {
-    color: colors.textMuted,
-    marginTop: spacing.xs
-  },
   errorWrap: {
     marginBottom: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md
   },
   warnWrap: {
     marginBottom: spacing.sm,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md
-  },
-  error: {
-    flex: 1
-  },
-  warn: {
-    flex: 1
-  },
-  retry: {
-    color: colors.primary
   },
   loaderWrap: {
     flex: 1
@@ -526,32 +396,15 @@ const styles = StyleSheet.create({
   messageList: {
     paddingBottom: spacing.md
   },
-  messageBubble: {
-    maxWidth: "78%",
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.sm
-  },
-  mine: {
-    alignSelf: "flex-end",
-    backgroundColor: colors.primary
-  },
-  theirs: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.surfaceMuted
-  },
-  mineText: {
-    color: colors.inverse
-  },
-  theirsText: {
-    color: colors.text
-  },
   composer: {
     flexDirection: "row",
     alignItems: "flex-end",
     gap: spacing.sm,
-    paddingVertical: spacing.sm
+    padding: spacing.sm,
+    backgroundColor: colors.backgroundElevated,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border
   },
   inputWrap: {
     flex: 1

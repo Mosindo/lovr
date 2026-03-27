@@ -37,23 +37,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    gap: spacing.md
+    gap: spacing.lg
   },
   rootCentered: {
     justifyContent: "center"
   },
   leading: {
-    paddingTop: spacing.sm
+    paddingTop: spacing.md
   },
   copy: {
     flex: 1,
-    gap: spacing.xs
+    gap: spacing.sm
   },
   copyCentered: {
     alignItems: "center"
   },
   action: {
-    paddingTop: spacing.sm
+    paddingTop: spacing.md
   },
   title: {
     color: colors.text

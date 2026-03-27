@@ -39,6 +39,7 @@ type AuthContextValue = {
   authError: string | null;
   currentUserQuery: UseQueryResult<AuthUser, Error>;
   applySession: (session: AuthSession) => Promise<void>;
+  clearAuthError: () => void;
   logout: () => Promise<void>;
 };
 
@@ -107,6 +108,10 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     },
     [queryClientInstance]
   );
+
+  const clearAuthError = useCallback(() => {
+    setAuthError(null);
+  }, []);
 
   const refreshCurrentSession = useCallback(async () => {
     if (!tokens?.refreshToken) {
@@ -206,9 +211,10 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       authError,
       currentUserQuery,
       applySession,
+      clearAuthError,
       logout
     }),
-    [applySession, authError, bootstrapping, currentUserQuery, isLoggingOut, logout, tokens]
+    [applySession, authError, bootstrapping, clearAuthError, currentUserQuery, isLoggingOut, logout, tokens]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -235,10 +241,11 @@ export function useCurrentUser(): UseQueryResult<AuthUser, Error> {
 }
 
 export function useLogin(): UseMutationResult<AuthSession, Error, AuthCredentials> {
-  const { applySession } = useAuth();
+  const { applySession, clearAuthError } = useAuth();
 
   return useMutation<AuthSession, Error, AuthCredentials>({
     mutationFn: async ({ email, password }) => {
+      clearAuthError();
       beginGlobalLoading("Signing in...");
       try {
         return await loginRequest(email, password);
@@ -253,10 +260,11 @@ export function useLogin(): UseMutationResult<AuthSession, Error, AuthCredential
 }
 
 export function useRegister(): UseMutationResult<AuthSession, Error, AuthCredentials> {
-  const { applySession } = useAuth();
+  const { applySession, clearAuthError } = useAuth();
 
   return useMutation<AuthSession, Error, AuthCredentials>({
     mutationFn: async ({ email, password }) => {
+      clearAuthError();
       beginGlobalLoading("Creating account...");
       try {
         return await registerRequest(email, password);

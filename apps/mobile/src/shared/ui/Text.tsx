@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, Text as RNText, type StyleProp, type TextProps as RNTextProps, type TextStyle } from "react-native";
-import { colors, fontSizes } from "./tokens";
+import { colors, fontWeights, typography } from "./tokens";
 
 export type TextVariant = "body" | "label" | "title" | "heading" | "caption" | "eyebrow" | "button";
 export type TextTone = "default" | "muted" | "primary" | "secondary" | "danger" | "success" | "inverse";
@@ -16,49 +16,19 @@ export type TextProps = RNTextProps & {
 const styles = StyleSheet.create({
   base: {
     color: colors.text,
-    fontSize: fontSizes.md
-  },
-  body: {
-    fontSize: fontSizes.md,
-    lineHeight: 22
-  },
-  label: {
-    fontSize: fontSizes.sm,
-    lineHeight: 20
-  },
-  title: {
-    fontSize: fontSizes.xxl,
-    lineHeight: 36
-  },
-  heading: {
-    fontSize: fontSizes.xl,
-    lineHeight: 30
-  },
-  caption: {
-    fontSize: fontSizes.xs,
-    lineHeight: 18
-  },
-  eyebrow: {
-    fontSize: fontSizes.xs,
-    lineHeight: 16,
-    textTransform: "uppercase",
-    letterSpacing: 0.8
-  },
-  button: {
-    fontSize: fontSizes.md,
-    lineHeight: 20
+    ...typography.body
   },
   regular: {
-    fontWeight: "400"
+    fontWeight: fontWeights.regular
   },
   medium: {
-    fontWeight: "500"
+    fontWeight: fontWeights.medium
   },
   semibold: {
-    fontWeight: "600"
+    fontWeight: fontWeights.semibold
   },
   bold: {
-    fontWeight: "700"
+    fontWeight: fontWeights.bold
   },
   defaultTone: {
     color: colors.text
@@ -84,13 +54,13 @@ const styles = StyleSheet.create({
 });
 
 const variantStyles: Record<TextVariant, TextStyle> = {
-  body: styles.body,
-  label: styles.label,
-  title: styles.title,
-  heading: styles.heading,
-  caption: styles.caption,
-  eyebrow: styles.eyebrow,
-  button: styles.button
+  body: typography.body,
+  label: typography.label,
+  title: typography.title,
+  heading: typography.heading,
+  caption: typography.caption,
+  eyebrow: typography.eyebrow,
+  button: typography.button
 };
 
 const weightStyles: Record<TextWeight, TextStyle> = {

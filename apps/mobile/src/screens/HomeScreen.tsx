@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FlatList, Pressable, StyleSheet, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 import { createPost, listPosts, type Post } from "../api/platform";
-import { Button, Card, Input, Loader, Text, colors, radii, spacing } from "../shared/ui";
+import { EmptyView, ErrorView, LoadingView } from "../shared/feedback";
+import { Badge, Button, Card, Input, Notice, Text, colors, spacing } from "../shared/ui";
 import { Header, ScreenContainer } from "../shared/layout";
 
 type HomeScreenProps = {
@@ -72,16 +73,17 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
       return null;
     }
     return (
-      <Text style={styles.empty} tone="muted">
-        No posts yet. Publish the first update.
-      </Text>
+      <EmptyView
+        message="Share progress, notes, or the first workspace announcement."
+        title="No posts yet"
+      />
     );
   }, [loading]);
 
   if (loading && posts.length === 0) {
     return (
       <ScreenContainer testID="home-screen">
-        <Loader fullScreen label="Loading workspace..." />
+        <LoadingView fullScreen label="Loading workspace..." />
       </ScreenContainer>
     );
   }
@@ -90,23 +92,22 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
     <ScreenContainer testID="home-screen">
       <Header
         action={
-          <Pressable disabled={loading || submitting} onPress={load} testID="home-reload-button">
-            <Text
-              style={[styles.reload, loading || submitting ? styles.mutedAction : null]}
-              tone={loading || submitting ? "muted" : "primary"}
-              variant="label"
-              weight="bold"
-            >
-              Reload
-            </Text>
-          </Pressable>
+          <Button
+            disabled={loading || submitting}
+            label="Reload"
+            onPress={load}
+            size="sm"
+            testID="home-reload-button"
+            variant="outline"
+          />
         }
         eyebrow="Workspace"
         style={styles.header}
+        subtitle="Team updates, product notes, and lightweight announcements."
         title="Home"
       />
 
-      <Card style={styles.composer}>
+      <Card style={styles.composer} variant="accent">
         <Text style={styles.sectionTitle} variant="heading" weight="bold">
           Publish an update
         </Text>
@@ -140,14 +141,10 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
       </Card>
 
       {error ? (
-        <Text style={styles.error} tone="danger" variant="label" weight="medium">
-          {error}
-        </Text>
+        <ErrorView actionLabel="Retry" message={error} onAction={() => void load()} style={styles.error} />
       ) : null}
       {feedback ? (
-        <Text style={styles.feedback} tone="success" variant="label" weight="medium">
-          {feedback}
-        </Text>
+        <Notice description="Your update is now visible in the workspace feed." style={styles.feedback} title={feedback} tone="success" />
       ) : null}
 
       <FlatList
@@ -161,9 +158,7 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
               <Text style={styles.cardTitle} variant="heading" weight="bold">
                 {item.title}
               </Text>
-              <Text style={styles.badge} tone="secondary" variant="caption" weight="bold">
-                {item.authorUserId === currentUserId ? "You" : "Member"}
-              </Text>
+              <Badge label={item.authorUserId === currentUserId ? "You" : "Member"} size="sm" variant="primary" />
             </View>
             <Text style={styles.cardBody}>{item.body}</Text>
             <Text style={styles.meta} tone="muted" variant="caption">
@@ -179,12 +174,6 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
 const styles = StyleSheet.create({
   header: {
     marginBottom: spacing.lg
-  },
-  reload: {
-    color: colors.primary
-  },
-  mutedAction: {
-    color: colors.textMuted
   },
   composer: {
     marginBottom: spacing.md
@@ -208,8 +197,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl
   },
   empty: {
-    marginTop: spacing.xxxl,
-    textAlign: "center"
+    marginTop: spacing.xxxl
   },
   card: {
     marginBottom: spacing.md
@@ -224,13 +212,6 @@ const styles = StyleSheet.create({
   cardTitle: {
     flex: 1,
     color: colors.text
-  },
-  badge: {
-    backgroundColor: "#d1fae5",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    overflow: "hidden"
   },
   cardBody: {
     color: colors.text,
