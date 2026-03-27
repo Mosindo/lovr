@@ -17,6 +17,11 @@ import {
   type AuthSession,
   type AuthUser
 } from "../api/auth";
+import {
+  beginGlobalLoading,
+  clearGlobalError,
+  endGlobalLoading
+} from "../shared/feedback";
 import { clearTokens, getTokens, saveTokens, type AuthTokens } from "../store/tokenStore";
 
 type AuthCredentials = {
@@ -96,6 +101,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       await saveTokens(toStoredTokens(session));
       setTokens(toStoredTokens(session));
       setAuthError(null);
+      clearGlobalError();
       setRefreshAttemptedFor(null);
       queryClientInstance.setQueryData([...CURRENT_USER_QUERY_KEY, session.accessToken], session.user);
     },
@@ -108,6 +114,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       return false;
     }
 
+    beginGlobalLoading("Refreshing session...");
     try {
       const nextSession = await refreshSessionRequest(tokens.refreshToken);
       await applySession(nextSession);
@@ -116,11 +123,14 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       await clearSession();
       setAuthError(formatAuthError(error, "Your session expired. Please login again."));
       return false;
+    } finally {
+      endGlobalLoading();
     }
   }, [applySession, clearSession, tokens?.refreshToken]);
 
   const logout = useCallback(async () => {
     setIsLoggingOut(true);
+    beginGlobalLoading("Signing out...");
     try {
       if (tokens?.refreshToken) {
         await logoutRequest(tokens.refreshToken);
@@ -130,6 +140,7 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
     } finally {
       await clearSession();
       setIsLoggingOut(false);
+      endGlobalLoading();
     }
   }, [clearSession, tokens?.refreshToken]);
 
@@ -227,7 +238,14 @@ export function useLogin(): UseMutationResult<AuthSession, Error, AuthCredential
   const { applySession } = useAuth();
 
   return useMutation<AuthSession, Error, AuthCredentials>({
-    mutationFn: ({ email, password }) => loginRequest(email, password),
+    mutationFn: async ({ email, password }) => {
+      beginGlobalLoading("Signing in...");
+      try {
+        return await loginRequest(email, password);
+      } finally {
+        endGlobalLoading();
+      }
+    },
     onSuccess: async (session) => {
       await applySession(session);
     }
@@ -238,7 +256,14 @@ export function useRegister(): UseMutationResult<AuthSession, Error, AuthCredent
   const { applySession } = useAuth();
 
   return useMutation<AuthSession, Error, AuthCredentials>({
-    mutationFn: ({ email, password }) => registerRequest(email, password),
+    mutationFn: async ({ email, password }) => {
+      beginGlobalLoading("Creating account...");
+      try {
+        return await registerRequest(email, password);
+      } finally {
+        endGlobalLoading();
+      }
+    },
     onSuccess: async (session) => {
       await applySession(session);
     }

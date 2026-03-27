@@ -1,4 +1,5 @@
 import { getAccessToken } from "../store/tokenStore";
+import { showGlobalError } from "../shared/feedback";
 
 export type ApiErrorPayload = {
   error?: string;
@@ -80,6 +81,9 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
 
       const apiPayload = data as ApiErrorPayload | null;
       const message = apiPayload?.error ?? `API request failed (${response.status})`;
+      if (response.status >= 500) {
+        showGlobalError(message);
+      }
       throw new ApiError(response.status, data, message);
     }
 
@@ -92,7 +96,12 @@ export async function apiRequest<T = unknown>(path: string, options?: RequestIni
   } catch (err) {
     const name = (err as { name?: string }).name;
     if (name === "AbortError") {
+      showGlobalError("The request timed out. Please try again.");
       throw new Error("API request timeout (10s)");
+    }
+
+    if (err instanceof TypeError) {
+      showGlobalError("Network error. Check your connection and try again.");
     }
     throw err;
   } finally {

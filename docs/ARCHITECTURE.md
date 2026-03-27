@@ -1,6 +1,6 @@
-# Architecture
+# go-react-saas Architecture
 
-This document explains how the fullstack boilerplate is organized so new developers and AI agents can quickly navigate the repository, understand responsibilities, and extend the system without breaking its boundaries.
+This document explains how `go-react-saas` is organized so new developers and AI agents can quickly navigate the repository, understand responsibilities, and extend the system without breaking its boundaries.
 
 ## 1. Monorepo Structure
 
@@ -170,4 +170,4 @@ When adding a feature, preserve the same architectural rules:
 - reusable platform infrastructure
 - clear, predictable module boundaries
 
-This consistency is what makes the boilerplate scalable as more features are added.
+This consistency is what makes `go-react-saas` scalable as more features are added.

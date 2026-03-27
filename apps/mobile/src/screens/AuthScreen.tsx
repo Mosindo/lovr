@@ -1,14 +1,8 @@
 import React, { useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
-} from "react-native";
+import { Pressable, StyleSheet } from "react-native";
 import { useLogin, useRegister } from "../hooks/useAuth";
+import { Button, Card, Input, Text, colors, spacing } from "../shared/ui";
+import { Header, ScreenContainer } from "../shared/layout";
 
 type Mode = "login" | "register";
 
@@ -45,40 +39,52 @@ export default function AuthScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>{title}</Text>
+    <ScreenContainer centered contentMaxWidth={440}>
+      <Card padding="lg" style={styles.card}>
+        <Header
+          centered
+          eyebrow="Access"
+          style={styles.header}
+          subtitle="Use your workspace credentials to continue."
+          title={title}
+        />
 
-        <TextInput
+        <Input
           autoCapitalize="none"
           autoComplete="email"
+          containerStyle={styles.field}
           keyboardType="email-address"
+          label="Email"
           onChangeText={setEmail}
           placeholder="Email"
-          style={styles.input}
           testID="auth-email-input"
           value={email}
         />
 
-        <TextInput
+        <Input
           autoCapitalize="none"
+          containerStyle={styles.field}
+          label="Password"
           onChangeText={setPassword}
           placeholder="Password"
           secureTextEntry
-          style={styles.input}
           testID="auth-password-input"
           value={password}
         />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={styles.error} tone="danger" variant="label" weight="medium">
+            {error}
+          </Text>
+        ) : null}
 
-        <Pressable disabled={submitting} onPress={onSubmit} style={styles.button} testID="auth-submit-button">
-          {submitting ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.buttonText}>{mode === "login" ? "Login" : "Register"}</Text>
-          )}
-        </Pressable>
+        <Button
+          fullWidth
+          label={mode === "login" ? "Login" : "Register"}
+          loading={submitting}
+          onPress={onSubmit}
+          testID="auth-submit-button"
+        />
 
         <Pressable
           disabled={submitting}
@@ -88,58 +94,30 @@ export default function AuthScreen() {
           }}
           testID="auth-switch-mode-button"
         >
-          <Text style={styles.switchText}>{switchLabel}</Text>
+          <Text style={styles.switchText} tone="primary" variant="label" weight="semibold">
+            {switchLabel}
+          </Text>
         </Pressable>
-      </View>
-    </SafeAreaView>
+      </Card>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f3f4f6"
-  },
   card: {
-    width: "88%",
-    borderRadius: 16,
-    backgroundColor: "#ffffff",
-    padding: 20,
-    elevation: 3
+    width: "100%"
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 16
+  header: {
+    marginBottom: spacing.lg
   },
-  input: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 10
-  },
-  button: {
-    marginTop: 4,
-    borderRadius: 10,
-    backgroundColor: "#111827",
-    paddingVertical: 12,
-    alignItems: "center"
-  },
-  buttonText: {
-    color: "#ffffff",
-    fontWeight: "700"
+  field: {
+    marginBottom: spacing.md
   },
   switchText: {
-    marginTop: 14,
-    color: "#2563eb",
+    marginTop: spacing.lg,
     textAlign: "center"
   },
   error: {
-    marginBottom: 6,
-    color: "#b91c1c"
+    marginBottom: spacing.sm
   }
 });
