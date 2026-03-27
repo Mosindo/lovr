@@ -1,8 +1,2 @@
-import React from "react";
-import { Card as TamaguiCard, type GetProps } from "tamagui";
-
-export type CardProps = GetProps<typeof TamaguiCard>;
-
-export default function Card(props: CardProps) {
-  return <TamaguiCard {...props} />;
-}
+export { Card as default } from "../../shared/ui";
+export type { CardProps } from "../../shared/ui";

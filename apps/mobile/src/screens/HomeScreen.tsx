@@ -1,15 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { createPost, listPosts, type Post } from "../api/platform";
+import { Button, Card, Input, Loader, Text, colors, radii, spacing } from "../shared/ui";
+import { Header, ScreenContainer } from "../shared/layout";
 
 type HomeScreenProps = {
   token: string;
@@ -78,39 +71,56 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
     if (loading) {
       return null;
     }
-    return <Text style={styles.empty}>No posts yet. Publish the first update.</Text>;
+    return (
+      <Text style={styles.empty} tone="muted">
+        No posts yet. Publish the first update.
+      </Text>
+    );
   }, [loading]);
 
   if (loading && posts.length === 0) {
     return (
-      <SafeAreaView style={styles.loaderContainer}>
-        <ActivityIndicator color="#0f172a" size="large" />
-      </SafeAreaView>
+      <ScreenContainer testID="home-screen">
+        <Loader fullScreen label="Loading workspace..." />
+      </ScreenContainer>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header} testID="home-screen">
-        <View>
-          <Text style={styles.eyebrow}>Workspace</Text>
-          <Text style={styles.title}>Home</Text>
-        </View>
-        <Pressable disabled={loading || submitting} onPress={load} testID="home-reload-button">
-          <Text style={[styles.reload, loading || submitting ? styles.mutedAction : null]}>Reload</Text>
-        </Pressable>
-      </View>
+    <ScreenContainer testID="home-screen">
+      <Header
+        action={
+          <Pressable disabled={loading || submitting} onPress={load} testID="home-reload-button">
+            <Text
+              style={[styles.reload, loading || submitting ? styles.mutedAction : null]}
+              tone={loading || submitting ? "muted" : "primary"}
+              variant="label"
+              weight="bold"
+            >
+              Reload
+            </Text>
+          </Pressable>
+        }
+        eyebrow="Workspace"
+        style={styles.header}
+        title="Home"
+      />
 
-      <View style={styles.composer}>
-        <Text style={styles.sectionTitle}>Publish an update</Text>
-        <TextInput
+      <Card style={styles.composer}>
+        <Text style={styles.sectionTitle} variant="heading" weight="bold">
+          Publish an update
+        </Text>
+        <Input
+          containerStyle={styles.field}
+          label="Title"
           onChangeText={setTitle}
           placeholder="Post title"
-          style={styles.titleInput}
           testID="home-post-title-input"
           value={title}
         />
-        <TextInput
+        <Input
+          containerStyle={styles.field}
+          label="Body"
           multiline
           numberOfLines={4}
           onChangeText={setBody}
@@ -119,18 +129,26 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
           testID="home-post-body-input"
           value={body}
         />
-        <Pressable
-          disabled={submitting || loading}
+        <Button
+          fullWidth
+          disabled={loading}
+          label="Publish"
+          loading={submitting}
           onPress={onSubmit}
-          style={[styles.publishButton, submitting || loading ? styles.publishButtonDisabled : null]}
           testID="home-post-submit-button"
-        >
-          <Text style={styles.publishText}>{submitting ? "Publishing..." : "Publish"}</Text>
-        </Pressable>
-      </View>
+        />
+      </Card>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      {error ? (
+        <Text style={styles.error} tone="danger" variant="label" weight="medium">
+          {error}
+        </Text>
+      ) : null}
+      {feedback ? (
+        <Text style={styles.feedback} tone="success" variant="label" weight="medium">
+          {feedback}
+        </Text>
+      ) : null}
 
       <FlatList
         contentContainerStyle={styles.list}
@@ -138,158 +156,87 @@ export default function HomeScreen({ token, currentUserId }: HomeScreenProps) {
         keyExtractor={(item) => item.id}
         ListEmptyComponent={emptyState}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <Card style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.title}</Text>
-              <Text style={styles.badge}>{item.authorUserId === currentUserId ? "You" : "Member"}</Text>
+              <Text style={styles.cardTitle} variant="heading" weight="bold">
+                {item.title}
+              </Text>
+              <Text style={styles.badge} tone="secondary" variant="caption" weight="bold">
+                {item.authorUserId === currentUserId ? "You" : "Member"}
+              </Text>
             </View>
             <Text style={styles.cardBody}>{item.body}</Text>
-            <Text style={styles.meta}>{formatPostDate(item.createdAt)}</Text>
-          </View>
+            <Text style={styles.meta} tone="muted" variant="caption">
+              {formatPostDate(item.createdAt)}
+            </Text>
+          </Card>
         )}
       />
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f6f7f2",
-    paddingHorizontal: 16,
-    paddingTop: 12
-  },
-  loaderContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f6f7f2"
-  },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 16
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    color: "#7c6f64"
-  },
-  title: {
-    fontSize: 30,
-    fontWeight: "800",
-    color: "#1f2937"
+    marginBottom: spacing.lg
   },
   reload: {
-    color: "#166534",
-    fontWeight: "700"
+    color: colors.primary
   },
   mutedAction: {
-    color: "#9ca3af"
+    color: colors.textMuted
   },
   composer: {
-    backgroundColor: "#fffdf7",
-    borderRadius: 18,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#e7e5d4",
-    marginBottom: 12
+    marginBottom: spacing.md
   },
   sectionTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#1f2937",
-    marginBottom: 12
+    marginBottom: spacing.lg
   },
-  titleInput: {
-    borderWidth: 1,
-    borderColor: "#d6d3c4",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: "#ffffff",
-    marginBottom: 10
+  field: {
+    marginBottom: spacing.md
   },
   bodyInput: {
-    borderWidth: 1,
-    borderColor: "#d6d3c4",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    minHeight: 96,
-    textAlignVertical: "top",
-    backgroundColor: "#ffffff"
-  },
-  publishButton: {
-    marginTop: 12,
-    borderRadius: 12,
-    backgroundColor: "#14532d",
-    paddingVertical: 12,
-    alignItems: "center"
-  },
-  publishButtonDisabled: {
-    opacity: 0.7
-  },
-  publishText: {
-    color: "#ffffff",
-    fontWeight: "700"
+    minHeight: 120
   },
   error: {
-    color: "#b91c1c",
-    marginBottom: 8
+    marginBottom: spacing.sm
   },
   feedback: {
-    color: "#166534",
-    marginBottom: 8
+    marginBottom: spacing.sm
   },
   list: {
-    paddingBottom: 32
+    paddingBottom: spacing.xxxl
   },
   empty: {
-    color: "#6b7280",
-    marginTop: 32,
+    marginTop: spacing.xxxl,
     textAlign: "center"
   },
   card: {
-    backgroundColor: "#ffffff",
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#ece7da"
+    marginBottom: spacing.md
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
-    gap: 10
+    marginBottom: spacing.sm,
+    gap: spacing.sm
   },
   cardTitle: {
     flex: 1,
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827"
+    color: colors.text
   },
   badge: {
-    backgroundColor: "#ecfccb",
-    color: "#365314",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: "700"
+    backgroundColor: "#d1fae5",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.pill,
+    overflow: "hidden"
   },
   cardBody: {
-    color: "#374151",
-    lineHeight: 21
+    color: colors.text,
+    lineHeight: 22
   },
   meta: {
-    marginTop: 12,
-    color: "#6b7280",
-    fontSize: 12
+    marginTop: spacing.md
   }
 });

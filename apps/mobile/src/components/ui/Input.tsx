@@ -1,8 +1,2 @@
-import React from "react";
-import { Input as TamaguiInput, type GetProps } from "tamagui";
-
-export type InputProps = GetProps<typeof TamaguiInput>;
-
-export default function Input(props: InputProps) {
-  return <TamaguiInput {...props} />;
-}
+export { Input as default } from "../../shared/ui";
+export type { InputProps } from "../../shared/ui";
